@@ -1,5 +1,7 @@
 module github.com/131/vauth-desktop
 
+// version: 0.1.0
+
 go 1.22
 
 require (

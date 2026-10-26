@@ -2,11 +2,16 @@
 
 ## Publishing a release
 
-1. Push a `v*` tag (`-beta.N` tags are published as prereleases):
+1. From a clean `master`, let [ppackage](https://github.com/131/ppackage)
+   bump the version marker (`// version:` in `go.mod`), commit and tag, then
+   push. Never create tags or GitHub releases by hand.
 
    ```sh
-   git tag v0.1.0 && git push origin v0.1.0
+   ppackage version patch   # or minor, major, X.Y.Z, X.Y.Z-beta.N
+   git push --follow-tags
    ```
+
+   `-beta.N` versions are published as prereleases.
 
 2. The `release` workflow (`.github/workflows/release.yml`, GitHub environment
    `production`) runs the tests, then GoReleaser
