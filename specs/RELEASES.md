@@ -8,8 +8,11 @@
 
    ```sh
    ppackage version patch   # or minor, major, X.Y.Z, X.Y.Z-beta.N
-   git push --follow-tags
+   git push origin master vX.Y.Z
    ```
+
+   Name the tag: ppackage creates a lightweight tag, which
+   `git push --follow-tags` does not send.
 
    `-beta.N` versions are published as prereleases.
 

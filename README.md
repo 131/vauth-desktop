@@ -7,6 +7,12 @@ space: your secrets, your profile and your SSH key. It signs you in with your
 SSH agent (Pageant or ssh-agent), like [vauth](https://github.com/131/vauth-login):
 no browser, no password.
 
+![vauth-desktop, the Secrets tab](specs/img/screenshot.svg)
+
+## How it works
+
+![SSH agent, vauth-desktop, Vault and GitHub](specs/img/architecture.svg)
+
 ## Install
 
 Download `vauth-desktop-windows-amd64.exe` from the
