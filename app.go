@@ -151,6 +151,16 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			return nil, i18n.Errorf("err.restart")
 		}
 		return nil, a.Relaunch(path)
+	case "update_open":
+		// Development builds cannot update: open the release page of the channel.
+		release, err := a.Updater.Check()
+		if err != nil {
+			return nil, err
+		}
+		if release.URL == "" {
+			return nil, i18n.Errorf("err.update.none")
+		}
+		return nil, a.Open(release.URL)
 	case "browse":
 		link, err := a.Client.BrowseURL()
 		if err != nil {

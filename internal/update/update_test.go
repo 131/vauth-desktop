@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,7 +46,8 @@ func TestUpdateCheck(t *testing.T) {
 	server, _ := releaseServer(t, "v1.2.0", nil, "")
 	for current, available := range map[string]bool{"v1.1.9": true, "1.2.0": false, "v1.3.0": false, "0.0.0-dev": false, "dev": false} {
 		release, err := testUpdater(t, server, current, "", nil).Check()
-		if err != nil || release.Available != available || release.Latest != "v1.2.0" || release.Channel != "production" {
+		development := strings.Contains(current, "dev")
+		if err != nil || release.Available != available || release.Development != development || release.Latest != "v1.2.0" || release.Channel != "production" {
 			t.Fatalf("%s: %+v %v", current, release, err)
 		}
 		if !slices.Equal(release.Channels, []string{"production", "beta"}) {

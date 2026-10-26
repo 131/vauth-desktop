@@ -186,6 +186,9 @@ function updates(release) {
   $('current-version').textContent = release.current;
   $('latest-version').textContent = release.latest || '—';
   $('upstream').textContent = release.upstream.replace(/^https:\/\//, ''); $('upstream').title = release.upstream;
+  $('update-dev').hidden = !release.development;
+  $('open-release').hidden = !(release.development && release.url);
+  if (release.latest) $('open-release').textContent = t('update.download', release.latest);
   if (!release.available || offered === release.latest) return;
   offered = release.latest;
   notice(t('update.available', release.latest, release.current), false, {label: t('update.install'), run: async () => {
@@ -199,8 +202,10 @@ $('check-update').addEventListener('click', () => run($('check-update'), async (
   const release = await call('update_check', true);
   updates(release);
   if (release.error) throw new Error(release.error);
-  if (release.enabled && !release.available) notice(t('update.uptodate', release.current, release.channel, release.latest || t('update.none')));
+  if (release.development && release.latest) notice(t('update.dev.notice', release.latest));
+  else if (release.enabled && !release.available) notice(t('update.uptodate', release.current, release.channel, release.latest || t('update.none')));
 }));
+$('open-release').addEventListener('click', () => run($('open-release'), () => call('update_open')));
 $('channel').addEventListener('change', () => run($('channel'), async () => {
   const release = await call('update_channel', $('channel').value);
   updates(release);

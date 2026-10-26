@@ -51,6 +51,8 @@ type Release struct {
 	Available bool     `json:"available"`
 	URL       string   `json:"url"`
 	Upstream  string   `json:"upstream"`
+	// Development builds never update: the UI links to the release instead.
+	Development bool `json:"development"`
 	// Error is the failed check, for the settings panel.
 	Error string `json:"error,omitempty"`
 }
@@ -138,12 +140,18 @@ func validTag(tag string) bool {
 // newer reports whether tag may replace the running version: development
 // builds (unparsable or -dev) never update, and downgrades are refused.
 func (u *Updater) newer(tag string) bool {
-	current, err := semver.NewVersion(u.Current)
-	if err != nil || strings.HasPrefix(current.Prerelease(), "dev") {
+	if u.development() {
 		return false
 	}
+	current, _ := semver.NewVersion(u.Current)
 	latest, err := semver.NewVersion(tag)
 	return err == nil && latest.GreaterThan(current)
+}
+
+// development reports a build that is not a release (unparsable or -dev).
+func (u *Updater) development() bool {
+	current, err := semver.NewVersion(u.Current)
+	return err != nil || strings.HasPrefix(current.Prerelease(), "dev")
 }
 
 // Check compares the tag of the configured channel (production when it is
@@ -154,7 +162,7 @@ func (u *Updater) Check() (Release, error) { return u.check(false) }
 func (u *Updater) CheckNow() (Release, error) { return u.check(true) }
 
 func (u *Updater) check(refresh bool) (Release, error) {
-	release := Release{Current: u.Current, Channel: settings.DefaultChannel}
+	release := Release{Current: u.Current, Channel: settings.DefaultChannel, Development: u.development()}
 	current, err := u.channels(refresh)
 	release.Enabled, release.Upstream = current.Update.Enable, current.Update.Upstream
 	if err != nil || !release.Enabled {
