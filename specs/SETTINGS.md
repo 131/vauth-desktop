@@ -8,7 +8,7 @@ The desktop preferences live in one YAML file, outside of any repository:
 
 (`os.UserConfigDir()`, so `~/.config/vauth-desktop/settings.yml` elsewhere.)
 A missing file means defaults; a missing key takes its default. The file is
-written when you change a setting from the settings panel (language, channel)
+written when you change a setting from the settings panel (language, automatic updates, channel)
 and when the channel list is refreshed ([releases](RELEASES.md)). An unreadable file is reported and
 never overwritten: fix it or delete it.
 
@@ -39,7 +39,7 @@ remote_channels:
 |-----|---------|:------------------:|-|
 | `language` | `fr-fr` | yes | `fr-fr` or `en-us`, for the window, notifications, errors and tray menu; applied at once. Unknown values fall back to `fr-fr`. |
 | `update.channel` | `production` | yes | Channel followed, one of the manifest keys. An unknown channel falls back to `production`. |
-| `update.enable` | `true` | no | `false` disables auto-update: no request to GitHub; the settings panel says so. |
+| `update.enable` | `true` | yes | *Automatic updates* checkbox. `false` disables auto-update: no request to GitHub, channel and check are hidden. |
 | `update.upstream` | `https://github.com/131/vauth-desktop` | no | GitHub repository providing `manifest.json` and the releases, `https://github.com/<owner>/<repo>`. Shown in the settings panel. |
 | `remote_channels` | | no | Cache of the upstream `manifest.json`, managed by the application. |
 

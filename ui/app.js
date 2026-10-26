@@ -178,6 +178,7 @@ $('close-settings').addEventListener('click', () => $('settings').close());
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) $('settings').close(); });
 let offered = '';
 function updates(release) {
+  $('update-enable').checked = release.enabled;
   $('update-disabled').hidden = release.enabled; $('update-fields').hidden = !release.enabled;
   $('update-error').hidden = !release.error; $('update-error').textContent = release.error || '';
   const channels = release.channels || [];
@@ -206,6 +207,12 @@ $('check-update').addEventListener('click', () => run($('check-update'), async (
   else if (release.enabled && !release.available) notice(t('update.uptodate', release.current, release.channel, release.latest || t('update.none')));
 }));
 $('open-release').addEventListener('click', () => run($('open-release'), () => call('update_open')));
+$('update-enable').addEventListener('change', () => run($('update-enable'), async () => {
+  offered = '';
+  const release = await call('update_enable', $('update-enable').checked);
+  updates(release);
+  if (release.error) throw new Error(release.error);
+}));
 $('channel').addEventListener('change', () => run($('channel'), async () => {
   const release = await call('update_channel', $('channel').value);
   updates(release);

@@ -164,6 +164,15 @@ func TestUpdateSettings(t *testing.T) {
 	if _, err := u.Install("v1.2.0"); err == nil {
 		t.Fatal("disabled updates must not install")
 	}
+	if release, err := u.SetEnabled(true); err != nil || !release.Enabled || !release.Available || *hits != 1 {
+		t.Fatalf("enabled: %+v %v (%d hits)", release, err, *hits)
+	}
+	if release, err := u.SetEnabled(false); err != nil || release.Enabled || release.Available {
+		t.Fatalf("disabled again: %+v %v", release, err)
+	}
+	if saved, _ := u.Settings.Load(); saved.Update.Enable {
+		t.Fatal("update.enable not saved")
+	}
 	for _, upstream := range []string{"http://github.com/131/vauth-desktop", "https://gitlab.com/131/vauth-desktop", "https://github.com/131", "https://github.com/131/vauth-desktop/releases"} {
 		u.Settings.Update(func(s *settings.Settings) { s.Update = settings.Update{Enable: true, Upstream: upstream} })
 		if _, err := u.Check(); err == nil {

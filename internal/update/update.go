@@ -194,6 +194,14 @@ func (u *Updater) check(refresh bool) (Release, error) {
 	return release, nil
 }
 
+// SetEnabled turns auto-update on or off (update.enable), then checks again.
+func (u *Updater) SetEnabled(enable bool) (Release, error) {
+	if _, err := u.Settings.Update(func(s *settings.Settings) { s.Update.Enable = enable }); err != nil {
+		return Release{}, err
+	}
+	return u.Check()
+}
+
 // SetChannel follows channel, which must be in the channel list.
 func (u *Updater) SetChannel(channel string) (Release, error) {
 	current, err := u.channels(false)

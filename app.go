@@ -132,6 +132,16 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			release.Error = err.Error()
 		}
 		return release, nil
+	case "update_enable":
+		enable, err := arg[bool](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		release, err := a.Updater.SetEnabled(enable)
+		if err != nil {
+			release.Error = err.Error()
+		}
+		return release, nil
 	case "update_channel":
 		channel, err := arg[string](args, 0)
 		if err != nil {
