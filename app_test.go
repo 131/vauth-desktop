@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/131/vauth-desktop/internal/i18n"
-	"github.com/131/vauth-desktop/settings"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/vault"
+	"github.com/131/vauth-desktop/v2/settings"
 )
 
 func TestSetLanguage(t *testing.T) {
@@ -25,5 +26,23 @@ func TestSetLanguage(t *testing.T) {
 	}
 	if _, err := app.Handle("nope", nil); err == nil || err.Error() != "unknown method: nope" {
 		t.Fatal(err)
+	}
+}
+
+func TestKVArgumentsAndRemovedMethod(t *testing.T) {
+	app := &App{Client: &vault.Client{}}
+	for _, method := range []string{"kv_list", "kv_read", "kv_capabilities", "kv_write", "kv_delete"} {
+		if _, err := app.Handle(method, nil); err == nil {
+			t.Error("accepted missing arguments", method)
+		}
+		if _, err := app.Handle(method, []json.RawMessage{json.RawMessage(`42`)}); err == nil {
+			t.Error("accepted wrong mount type", method)
+		}
+	}
+	if _, err := app.Handle("browse", nil); err == nil {
+		t.Fatal("removed Vault browser method still works")
+	}
+	if result, err := app.Handle("session", nil); err != nil || result.(*vault.Session) != nil {
+		t.Fatal("signed-out session unexpectedly authenticated")
 	}
 }

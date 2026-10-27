@@ -68,3 +68,11 @@ removed at the next start. The executable's folder must be writable by the user.
 
 `VAUTH_VERIFY_SIGNED=<signed exe> go test ./internal/update` runs the
 Authenticode check against a real signed binary on Windows.
+
+## Update interaction
+
+Download/install stays disabled with a spinner through checksum and signature
+verification and relaunch. Notifications follow the active modal host and return
+to the page when it closes, so the backdrop does not intercept an action click.
+A failed install keeps its action available for retry. A missing manifest is
+reported explicitly rather than as a generic download failure.

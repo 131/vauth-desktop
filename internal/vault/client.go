@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
+	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 
 	sshagentcrypt "github.com/131/ssh-agent-crypt"
-	"github.com/131/vauth-desktop/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
 	vauthlogin "github.com/131/vauth-login"
 )
 
@@ -46,15 +46,22 @@ type Client struct {
 	// its token cache and renewal logic.
 	New func() (*vauthlogin.Vauth, error)
 	Now func() time.Time
-	// HTTPClient serves the wrapped token request, which needs a header that
-	// vauth-login's Request does not send.
-	HTTPClient *http.Client
+	// OIDC state and KV routes stay in Go, never in the page.
+	pending    *oidcAttempt
+	listenOIDC func() (net.Listener, error)
+	ssoTimeout time.Duration
 
-	mu        sync.Mutex
-	vauth     *vauthlogin.Vauth
-	token     string
-	refreshAt time.Time
-	login     string
+	mu         sync.Mutex
+	vauth      *vauthlogin.Vauth
+	token      string
+	refreshAt  time.Time
+	login      string
+	profile    map[string]string
+	sso        bool
+	expiresAt  time.Time
+	renewable  bool
+	mounts     map[string]Mount
+	mountTypes map[string]string
 }
 
 func (c *Client) now() time.Time {
@@ -127,11 +134,22 @@ func vaultError(err error) error {
 // call sends a Vault request, refreshing the session when due and logging in
 // again once when the token is no longer valid. A nil result means 404 when optional.
 func (c *Client) call(method, path string, payload any, optional bool) (map[string]any, error) {
+	if c.sso {
+		if !c.expiresAt.IsZero() && !c.now().Before(c.expiresAt) {
+			c.clear()
+			return nil, ErrSessionExpired
+		}
+		if c.renewable && !c.refreshAt.IsZero() && !c.now().Before(c.refreshAt) {
+			if err := c.renewSSO(); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if c.vauth == nil {
 		if err := c.connect(false); err != nil {
 			return nil, err
 		}
-	} else if !c.refreshAt.IsZero() && !c.now().Before(c.refreshAt) {
+	} else if !c.sso && !c.refreshAt.IsZero() && !c.now().Before(c.refreshAt) {
 		if err := c.connect(false); err != nil {
 			return nil, err
 		}
@@ -142,6 +160,10 @@ func (c *Client) call(method, path string, payload any, optional bool) (map[stri
 			return nil, err
 		}
 		if status == 403 && attempt == 0 && !c.valid() {
+			if c.sso {
+				c.clear()
+				return nil, ErrSessionExpired
+			}
 			if err := c.connect(true); err != nil {
 				return nil, err
 			}
@@ -174,17 +196,30 @@ type Session struct {
 	VaultAddr string            `json:"vault_addr"`
 	Profile   map[string]string `json:"profile"`
 	FixedVars []string          `json:"fixed_vars"`
+	AuthMode  string            `json:"auth_mode"`
 }
 
 // Connect authenticates (renew forces a new login) and loads the Vault entity profile.
 func (c *Client) Connect(renew bool) (*Session, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.cancelSSO()
 	if renew || c.vauth == nil {
-		if err := c.connect(renew); err != nil {
+		next := &Client{New: c.New, Now: c.Now}
+		if err := next.connect(renew); err != nil {
 			return nil, err
 		}
+		session, err := next.loadProfile()
+		if err != nil {
+			return nil, err
+		}
+		c.adopt(next)
+		return session, nil
 	}
+	return c.loadProfile()
+}
+
+func (c *Client) loadProfile() (*Session, error) {
 	lookup, err := c.call("GET", "auth/token/lookup-self", nil, false)
 	if err != nil {
 		return nil, err
@@ -217,7 +252,12 @@ func (c *Client) Connect(renew bool) (*Session, error) {
 		return nil, i18n.Errorf("err.profile")
 	}
 	c.login = profile["VAUTH_USER_LOGIN"]
-	return &Session{Login: c.login, VaultAddr: c.vauth.VAULT_ADDR(), Profile: profile, FixedVars: fixedVars}, nil
+	c.profile = profile
+	mode := "ssh"
+	if c.sso {
+		mode = "sso"
+	}
+	return &Session{Login: c.login, VaultAddr: c.vauth.VAULT_ADDR(), Profile: profile, FixedVars: fixedVars, AuthMode: mode}, nil
 }
 
 func (c *Client) connected() error {
@@ -269,8 +309,13 @@ func (c *Client) Write(values map[string]any, version int64) error {
 		return err
 	}
 	for key := range values {
-		if _, err := VariableName(key); err != nil {
+		if _, reserved := c.profile[key]; reserved {
+			return i18n.Errorf("err.reserved")
+		}
+		if normalized, err := VariableName(key); err != nil {
 			return err
+		} else if normalized != key {
+			return i18n.Errorf("err.name")
 		}
 	}
 	_, err := c.call("POST", c.databasePath(), map[string]any{"data": values, "options": map[string]any{"cas": version}}, false)
@@ -354,6 +399,13 @@ func (c *Client) PublishSSH(value string) error {
 	if err := c.connected(); err != nil {
 		return err
 	}
+	caps, err := c.capabilities(c.sshPath())
+	if err != nil {
+		return err
+	}
+	if !allowed(caps, "update") && !allowed(caps, "create") {
+		return &VaultError{403}
+	}
 	_, err = c.call("POST", c.sshPath(), map[string]any{"public_keys": []string{key}}, false)
 	return err
 }
@@ -391,52 +443,4 @@ func AgentKeys(address string) ([]AgentKey, error) {
 		result = append(result, AgentKey{Key: line, Comment: key.Comment, Fingerprint: ssh.FingerprintSHA256(key)})
 	}
 	return result, nil
-}
-
-// BrowseURL creates a wrapped child token for the native Vault UI login.
-// The current token never appears in the URL.
-func (c *Client) BrowseURL() (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if err := c.connected(); err != nil {
-		return "", err
-	}
-	// Also enforces vauth-login's destination check before the direct request.
-	lookup, err := c.call("GET", "auth/token/lookup-self", nil, false)
-	if err != nil {
-		return "", err
-	}
-	data, _ := lookup["data"].(map[string]any)
-	ttl, _ := data["ttl"].(float64)
-	renewable, _ := data["renewable"].(bool)
-	payload, _ := json.Marshal(map[string]any{"ttl": fmt.Sprintf("%ds", int64(ttl)), "renewable": renewable, "display_name": "vauth-desktop-browse"})
-	base := strings.TrimRight(c.vauth.VAULT_ADDR(), "/")
-	req, err := http.NewRequest("POST", base+"/v1/auth/token/create", strings.NewReader(string(payload)))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Vault-Token", c.token)
-	req.Header.Set("X-Vault-Wrap-TTL", "60s")
-	client := c.HTTPClient
-	if client == nil {
-		client = &http.Client{Timeout: 60 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return "", &VaultError{res.StatusCode}
-	}
-	var result struct {
-		WrapInfo *struct {
-			Token string `json:"token"`
-		} `json:"wrap_info"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil || result.WrapInfo == nil || result.WrapInfo.Token == "" {
-		return "", i18n.Errorf("err.browse")
-	}
-	return base + "/ui/vault/auth?wrapped_token=" + url.QueryEscape(result.WrapInfo.Token), nil
 }

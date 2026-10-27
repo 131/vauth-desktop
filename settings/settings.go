@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/131/vauth-desktop/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *Settings) normalize() {
 	s.Language = i18n.Normalize(s.Language)
 }
 
-const header = "# vauth desktop settings: https://github.com/131/vauth-desktop/blob/master/specs/SETTINGS.md\n"
+const header = "# vauth desktop settings: https://github.com/131/vauth-desktop/v2/blob/master/specs/SETTINGS.md\n"
 
 // Store is the settings file. A missing file means defaults; an unreadable
 // one is reported and left untouched.

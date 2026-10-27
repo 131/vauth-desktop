@@ -2,16 +2,18 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"syscall"
 
-	"github.com/131/vauth-desktop/internal/i18n"
-	"github.com/131/vauth-desktop/internal/tray"
-	"github.com/131/vauth-desktop/internal/update"
-	"github.com/131/vauth-desktop/ui"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/tray"
+	"github.com/131/vauth-desktop/v2/internal/update"
+	"github.com/131/vauth-desktop/v2/internal/vault"
+	"github.com/131/vauth-desktop/v2/ui"
 	webview "github.com/jchv/go-webview2"
 )
 
@@ -31,6 +33,7 @@ func main() {
 	}
 	update.Cleanup()
 	app := NewApp(openBrowser)
+	defer app.Client.Close()
 	data := ""
 	if dir, err := os.UserCacheDir(); err == nil {
 		data = filepath.Join(dir, "vauth-desktop", "webview")
@@ -49,28 +52,29 @@ func main() {
 	defer w.Destroy()
 	w.SetSize(int(tray.Scale(600)), int(tray.Scale(380)), webview.HintMin)
 	icon := tray.Install(uintptr(w.Window()))
+	icon.AfterModal = func() { w.Dispatch(func() {}) }
 	app.Relaunch = func(path string) error {
 		command := exec.Command(path, updatedFlag)
 		if err := command.Start(); err != nil {
 			return err
 		}
 		command.Process.Release()
-		w.Dispatch(icon.Quit)
+		icon.Dispatch(icon.Quit)
 		return nil
 	}
 	// Vault calls run outside the UI thread; results come back through Dispatch.
-	w.Bind("vauth_call", func(id int, method string, args []json.RawMessage) {
+	w.Bind("vauth_call", func(id int, page string, method string, args []json.RawMessage) {
 		go func() {
 			result, err := app.Handle(method, args)
 			message := ""
 			if err != nil {
 				message = err.Error()
 			}
-			payload, _ := json.Marshal(map[string]any{"id": id, "error": message, "result": result})
-			w.Dispatch(func() { w.Eval("window.vauthDone(" + string(payload) + ")") })
+			payload, _ := json.Marshal(map[string]any{"id": id, "page": page, "error": message, "expired": errors.Is(err, vault.ErrSessionExpired), "result": result})
+			icon.Dispatch(func() { w.Eval("window.vauthDone(" + string(payload) + ")") })
 		}()
 	})
-	app.Reload = func() { w.Dispatch(func() { w.SetHtml(ui.Page(i18n.Current())) }) }
+	app.Reload = func() { icon.Dispatch(func() { w.SetHtml(ui.Page(i18n.Current())) }) }
 	w.SetHtml(ui.Page(i18n.Current()))
 	w.Run()
 }

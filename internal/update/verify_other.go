@@ -2,7 +2,7 @@
 
 package update
 
-import "github.com/131/vauth-desktop/internal/i18n"
+import "github.com/131/vauth-desktop/v2/internal/i18n"
 
 // Authenticode signatures exist only on Windows, the only released target.
 func Authenticode(candidate, current string) error {

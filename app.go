@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	sshagentcrypt "github.com/131/ssh-agent-crypt"
-	"github.com/131/vauth-desktop/internal/i18n"
-	"github.com/131/vauth-desktop/internal/update"
-	"github.com/131/vauth-desktop/internal/vault"
-	"github.com/131/vauth-desktop/settings"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/update"
+	"github.com/131/vauth-desktop/v2/internal/vault"
+	"github.com/131/vauth-desktop/v2/settings"
 	vauthlogin "github.com/131/vauth-login"
 )
 
@@ -76,6 +76,50 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			return nil, err
 		}
 		return a.Client.Connect(renew)
+	case "sso_login":
+		return a.Client.LoginSSO(a.Open)
+	case "sso_cancel":
+		a.Client.CancelSSO()
+		return nil, nil
+	case "session_check":
+		return nil, a.Client.CheckSession()
+	case "session":
+		return a.Client.ExistingSession()
+	case "kv_mounts":
+		return a.Client.Mounts()
+	case "kv_list", "kv_read", "kv_capabilities", "kv_write", "kv_delete":
+		mount, err := arg[string](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		path, err := arg[string](args, 1)
+		if err != nil {
+			return nil, err
+		}
+		switch method {
+		case "kv_list":
+			return a.Client.ListKV(mount, path)
+		case "kv_read":
+			return a.Client.ReadKV(mount, path)
+		case "kv_capabilities":
+			return a.Client.KVCapabilities(mount, path)
+		case "kv_delete":
+			return nil, a.Client.DeleteKV(mount, path)
+		default:
+			values, err := arg[map[string]any](args, 2)
+			if err != nil {
+				return nil, err
+			}
+			version, err := arg[int64](args, 3)
+			if err != nil {
+				return nil, err
+			}
+			create, err := arg[bool](args, 4)
+			if err != nil {
+				return nil, err
+			}
+			return nil, a.Client.WriteKV(mount, path, values, version, create)
+		}
 	case "read":
 		return a.Client.Read()
 	case "write":
@@ -116,6 +160,9 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			return nil, err
 		}
 		i18n.Set(language)
+		if a.Client != nil {
+			a.Client.CancelSSO()
+		}
 		if a.Reload != nil {
 			a.Reload()
 		}
@@ -171,12 +218,6 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			return nil, i18n.Errorf("err.update.none")
 		}
 		return nil, a.Open(release.URL)
-	case "browse":
-		link, err := a.Client.BrowseURL()
-		if err != nil {
-			return nil, err
-		}
-		return nil, a.Open(link)
 	}
 	return nil, i18n.Errorf("err.method", method)
 }

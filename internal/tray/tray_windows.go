@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/131/vauth-desktop/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
 )
 
 var (
@@ -41,10 +41,12 @@ const (
 	wmSize          = 0x0005
 	wmClose         = 0x0010
 	wmCommand       = 0x0111
+	wmExitSizeMove  = 0x0232
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
 	wmTray          = 0x8000 + 1 // WM_APP + 1
+	wmDispatch      = 0x8000 + 2
 	sizeMinimized   = 1
 	swHide          = 0
 	swRestore       = 9
@@ -90,6 +92,8 @@ type Tray struct {
 	taskbarCreated uintptr
 	show           uintptr
 	quitting       bool
+	AfterModal     func()
+	dispatch       uiDispatch
 }
 
 const WindowTitle = "vauth desktop"
@@ -170,7 +174,12 @@ func (t *Tray) restore() {
 
 func (t *Tray) menu() {
 	menu, _, _ := procCreatePopupMenu.Call()
-	defer procDestroyMenu.Call(menu)
+	defer func() {
+		procDestroyMenu.Call(menu)
+		if t.AfterModal != nil {
+			t.AfterModal()
+		}
+	}()
 	open, _ := windows.UTF16PtrFromString(i18n.T("tray.open"))
 	quit, _ := windows.UTF16PtrFromString(i18n.T("tray.quit"))
 	procAppendMenu.Call(menu, mfString, menuOpen, uintptr(unsafe.Pointer(open)))
@@ -191,6 +200,13 @@ func (t *Tray) menu() {
 
 func (t *Tray) wndproc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	switch {
+	case msg == wmDispatch:
+		t.runDispatched()
+		return 0
+	case msg == wmExitSizeMove:
+		if t.AfterModal != nil {
+			t.AfterModal()
+		}
 	case msg == wmTray:
 		switch lparam & 0xffff {
 		case wmLButtonUp, wmLButtonDblClk:

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/131/vauth-desktop/settings"
+	"github.com/131/vauth-desktop/v2/settings"
 )
 
 // releaseServer serves manifest.json (production → tag, beta → v2.0.0-beta.1)
@@ -173,7 +173,7 @@ func TestUpdateSettings(t *testing.T) {
 	if saved, _ := u.Settings.Load(); saved.Update.Enable {
 		t.Fatal("update.enable not saved")
 	}
-	for _, upstream := range []string{"http://github.com/131/vauth-desktop", "https://gitlab.com/131/vauth-desktop", "https://github.com/131", "https://github.com/131/vauth-desktop/releases"} {
+	for _, upstream := range []string{"http://github.com/131/vauth-desktop", "https://gitlab.com/131/vauth-desktop", "https://github.com/131", "https://github.com/131/vauth-desktop/v2/releases"} {
 		u.Settings.Update(func(s *settings.Settings) { s.Update = settings.Update{Enable: true, Upstream: upstream} })
 		if _, err := u.Check(); err == nil {
 			t.Fatalf("upstream %s accepted", upstream)

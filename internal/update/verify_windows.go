@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/131/vauth-desktop/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
 )
 
 var (

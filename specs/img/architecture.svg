@@ -1,135 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="980" height="580" viewBox="0 0 980 580" font-family="Segoe UI, system-ui, sans-serif" font-size="12" fill="#24342f">
-<title>vauth-desktop: how it fits together</title>
-<defs>
-  <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#4f6357"/></marker>
-  <marker id="arrY" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#b38900"/></marker>
-  <filter id="sh" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#12322a" flood-opacity=".14"/></filter>
-  <g id="lock"><rect x="-11" y="-11" width="22" height="22" rx="5" fill="#f5c400"/><path d="M-4.5 -1 v-3 a4.5 4.5 0 0 1 9 0 v3" fill="none" stroke="#111" stroke-width="2"/><rect x="-6.5" y="-1" width="13" height="9" rx="1.6" fill="#111"/><circle cx="0" cy="3" r="1.4" fill="#f5c400"/></g>
-</defs>
-<style>
-  .zone{fill:#f7f9f6;stroke:#d3ddd1;stroke-width:1.2}
-  .ztitle{font-size:13px;font-weight:700;fill:#1b4332}
-  .zsub{font-size:11px;fill:#77867d}
-  .box{fill:#fff;stroke:#cfd9cc;stroke-width:1.2}
-  .hero{fill:#fff;stroke:#24533c;stroke-width:1.8}
-  .t{font-size:12.5px;font-weight:700}
-  .s{font-size:11px;fill:#6b7a6f}
-  .m{font-family:Consolas,ui-monospace,monospace;font-size:11px;fill:#3f5347}
-  .l{stroke:#4f6357;stroke-width:1.4;fill:none}
-  .d{stroke-dasharray:3 3}
-  .lab{font-size:10.5px;fill:#4f6357}
-  .y{stroke:#b38900;stroke-width:1.4;fill:none;stroke-dasharray:5 4}
-  .ylab{font-size:10.5px;fill:#8a6a00}
-</style>
-<rect width="980" height="580" fill="#ffffff"/>
-
-<!-- ============ Windows session ============ -->
-<rect class="zone" x="20" y="20" width="580" height="540" rx="10"/>
-<text class="ztitle" x="38" y="44">Your Windows session</text>
-<text class="zsub" x="38" y="60">your private key never leaves the agent</text>
-
-<!-- SSH agent -->
-<rect class="box" x="38" y="96" width="122" height="104" rx="6"/>
-<text class="t" x="50" y="116">SSH agent</text>
-<text class="s" x="50" y="133">Pageant or</text>
-<text class="s" x="50" y="147">OpenSSH ssh-agent</text>
-<text class="s" x="50" y="172">holds your key,</text>
-<text class="s" x="50" y="186">signs on demand</text>
-
-<!-- vauth-desktop -->
-<g filter="url(#sh)"><rect class="hero" x="220" y="80" width="362" height="200" rx="8"/></g>
-<use href="#lock" x="246" y="106"/>
-<text class="t" x="266" y="111" font-size="14">vauth-desktop.exe</text>
-<text class="s" x="266" y="126">one portable, signed executable · lives in the tray</text>
-<rect class="box" x="236" y="140" width="156" height="124" rx="6"/>
-<text class="t" x="248" y="160">Window</text>
-<text class="s" x="248" y="175">WebView2, no remote content</text>
-<text class="s" x="248" y="197">• Secrets</text>
-<text class="s" x="248" y="212">• Profile</text>
-<text class="s" x="248" y="227">• SSH key</text>
-<text class="s" x="248" y="242">• Settings · notifications</text>
-<rect class="box" x="408" y="140" width="158" height="124" rx="6"/>
-<text class="t" x="420" y="160">Go core</text>
-<text class="s" x="420" y="175">every Vault call, off the UI</text>
-<text class="m" x="420" y="197">vauth-login</text>
-<text class="s" x="420" y="211">sign-in, token renewal</text>
-<text class="m" x="420" y="233">internal/update</text>
-<text class="s" x="420" y="247">channels, signature checks</text>
-<path class="l" d="M393 202 h14" marker-end="url(#arr)" marker-start="url(#arr)"/>
-
-<path class="l" d="M220 148 H161" marker-end="url(#arr)" marker-start="url(#arr)"/>
-<text class="lab" x="190" y="141" text-anchor="middle">sign the</text>
-<text class="lab" x="190" y="163" text-anchor="middle">nonce</text>
-
-<!-- local files -->
-<rect class="box" x="38" y="310" width="150" height="70" rx="6"/>
-<text class="t" x="50" y="330">Token cache</text>
-<text class="s" x="50" y="346">encrypted by your agent</text>
-<text class="m" x="50" y="366">ssh-agent-crypt</text>
-<path class="l" d="M188 330 C 230 330, 250 310, 250 281" marker-end="url(#arr)" marker-start="url(#arr)"/>
-
-<rect class="box" x="210" y="310" width="150" height="70" rx="6"/>
-<text class="t" x="222" y="330">.vauthrc</text>
-<text class="s" x="222" y="346">which Vault, which role</text>
-<text class="s" x="222" y="362">shared with vauth</text>
-<path class="l" d="M300 310 V281" marker-end="url(#arr)"/>
-
-<rect class="box" x="374" y="310" width="150" height="70" rx="6"/>
-<text class="t" x="386" y="330">settings.yml</text>
-<text class="m" x="386" y="346">%APPDATA%\vauth-desktop</text>
-<text class="s" x="386" y="362">language, release channel</text>
-<path class="l" d="M450 310 V281" marker-end="url(#arr)" marker-start="url(#arr)"/>
-
-<!-- tools -->
-<rect class="box" x="38" y="420" width="270" height="122" rx="6"/>
-<text class="t" x="50" y="440">Your tools</text>
-<text class="s" x="50" y="456">same secrets, same sign-in, same cache</text>
-<text class="m" x="50" y="480">vauth</text><text class="s" x="100" y="480">command line</text>
-<text class="m" x="50" y="498">venv</text><text class="s" x="100" y="498">secrets as environment variables</text>
-<text class="s" x="50" y="524">edit a secret in the window:</text>
-<text class="s" x="50" y="538">your next terminal already has it</text>
-<path class="l d" d="M113 420 V381" marker-end="url(#arr)"/>
-
-<!-- browser -->
-<rect class="box" x="330" y="420" width="252" height="70" rx="6"/>
-<text class="t" x="342" y="440">Browser</text>
-<text class="s" x="342" y="456">Vault UI, already signed in:</text>
-<text class="s" x="342" y="472">one-use wrapped token, never in a URL</text>
-<path class="l" d="M552 281 V419" marker-end="url(#arr)"/>
-<text class="lab" x="547" y="404" text-anchor="end">Browse Vault</text>
-
-<!-- ============ Vault ============ -->
-<rect class="zone" x="640" y="20" width="320" height="340" rx="10"/>
-<text class="ztitle" x="658" y="44">HashiCorp Vault</text>
-<text class="zsub" x="658" y="60">your company's Vault server</text>
-<rect class="box" x="656" y="76" width="288" height="58" rx="6"/>
-<text class="m" x="668" y="96">auth/ssh</text><text class="s" x="728" y="96">nonce → signature → token</text>
-<text class="s" x="668" y="116">role/&lt;login&gt; holds your public key</text>
-<rect class="box" x="656" y="146" width="288" height="58" rx="6"/>
-<text class="m" x="668" y="166">.vauth_database</text><text class="s" x="776" y="166">your personal secrets</text>
-<text class="s" x="668" y="186">compare-and-set writes</text>
-<rect class="box" x="656" y="216" width="288" height="46" rx="6"/>
-<text class="m" x="668" y="243">identity</text><text class="s" x="730" y="243">your profile, read-only</text>
-<rect class="box" x="656" y="274" width="288" height="70" rx="6"/>
-<text class="m" x="668" y="294">sys/wrapping</text><text class="s" x="760" y="294">one-use child token</text>
-<text class="s" x="668" y="312">60 s, for the browser</text>
-
-<path class="l" d="M566 160 C 610 160, 612 105, 655 105" marker-end="url(#arr)"/>
-<text class="lab" x="611" y="122" text-anchor="middle">sign in</text>
-<path class="l" d="M566 184 C 610 184, 612 175, 655 175" marker-end="url(#arr)" marker-start="url(#arr)"/>
-<text class="lab" x="611" y="198" text-anchor="middle">secrets</text>
-<path class="l" d="M566 212 C 610 212, 612 239, 655 239" marker-end="url(#arr)"/>
-<path class="l" d="M566 240 C 610 240, 612 300, 655 300" marker-end="url(#arr)"/>
-<text class="lab" x="611" y="262" text-anchor="middle">wrap</text>
-<path class="l" d="M583 455 C 700 455, 800 420, 800 345" marker-end="url(#arr)"/>
-<text class="lab" x="690" y="420" text-anchor="middle">unwrap</text>
-
-<!-- ============ GitHub ============ -->
-<rect class="zone" x="640" y="460" width="320" height="100" rx="10"/>
-<text class="ztitle" x="658" y="484">GitHub · 131/vauth-desktop</text>
-<text class="m" x="658" y="506">manifest.json</text><text class="s" x="748" y="506">channel → release tag</text>
-<text class="s" x="658" y="524">Authenticode-signed exe + SHA256SUMS</text>
-<text class="s" x="658" y="542">same signer only, never a downgrade</text>
-<path class="y" d="M582 258 C 620 258, 615 500, 639 510" marker-end="url(#arrY)"/>
-<text class="ylab" x="606" y="380" transform="rotate(-90 606 380)" text-anchor="middle">auto-update</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520">
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="#467461"/></marker></defs>
+<style>text{font-family:Segoe UI,Arial,sans-serif;fill:#24342f}.title{font-size:22px;font-weight:700}.head{font-size:17px;font-weight:600}.body{font-size:13px}.box{fill:#fff;stroke:#c7d8cd;stroke-width:2}.link{fill:none;stroke:#467461;stroke-width:2;marker-end:url(#arrow)}.label{font-size:12px;fill:#467461}</style>
+<rect width="1000" height="520" rx="14" fill="#f7f9f6"/>
+<text x="30" y="42" class="title">vauth-desktop</text><text x="30" y="66" class="body">Embedded workspace, Go Vault client and two sign-in modes</text>
+<rect class="box" x="30" y="120" width="210" height="100" rx="10"/><text class="head" x="48" y="150">SSH agent / Pageant</text><text class="body" x="48" y="177">Public keys and signatures</text><text class="body" x="48" y="199">Normal encrypted CLI cache</text>
+<rect class="box" x="315" y="100" width="300" height="220" rx="10"/><text class="head" x="334" y="131">Desktop + Go</text><text class="body" x="334" y="162">Vauth Secured Environnement (venv)</text><text class="body" x="334" y="187">SSH Keys</text><text class="body" x="334" y="212">Secrets browser</text><text class="body" x="334" y="248">Vault requests outside the UI thread</text><text class="body" x="334" y="272">SSO token and drafts: memory only</text><text class="body" x="334" y="296">No remote content in WebView2</text>
+<rect class="box" x="700" y="100" width="265" height="155" rx="10"/><text class="head" x="718" y="132">Vault</text><text class="body" x="718" y="162">Identity and own SSH role</text><text class="body" x="718" y="187">Accessible KV v1 / KV v2 mounts</text><text class="body" x="718" y="212">ACLs and KV v2 compare-and-set</text><text class="body" x="718" y="236">OIDC challenge and code exchange</text>
+<rect class="box" x="30" y="365" width="230" height="108" rx="10"/><text class="head" x="48" y="395">System browser</text><text class="body" x="48" y="422">Login with SSO</text><text class="body" x="48" y="446">Callback stays on localhost</text>
+<rect class="box" x="700" y="355" width="265" height="108" rx="10"/><text class="head" x="718" y="386">Entra OIDC</text><text class="body" x="718" y="414">Interactive provider sign-in</text><text class="body" x="718" y="441">Client secret remains with Vault</text>
+<path class="link" d="M240 165H315"/><text class="label" x="247" y="153">SSH login</text>
+<path class="link" d="M615 175H700"/><text class="label" x="627" y="162">Vault API</text>
+<path class="link" d="M832 255V355"/><text class="label" x="843" y="304">OIDC</text>
+<path class="link" d="M260 409H700"/><text class="label" x="370" y="399">Provider sign-in in system browser</text>
+<path class="link" d="M145 365V286H315"/><text class="label" x="34" y="272">localhost:8250 callback</text>
+<text class="body" x="315" y="490">Updates: GitHub manifest, signed executable and checksum verification</text>
 </svg>

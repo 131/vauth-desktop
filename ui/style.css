@@ -62,10 +62,8 @@ nav{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 0}
 .section-head h2{flex:none}
 .search{margin:6px 0;display:flex;align-items:center;gap:6px;max-width:320px}
 .search input{margin:0}
-#entries,#profile-entries{flex:1;min-height:0;overflow-y:auto;border:1px solid var(--line);background:#fff;margin-bottom:8px}
+#entries{flex:1;min-height:0;overflow-y:auto;border:1px solid var(--line);background:#fff;margin-bottom:8px}
 #ssh-panel:not([hidden]){overflow-y:auto}
-#profile-panel>h2{display:none}
-#profile-panel>.muted{margin:0 0 6px}
 /* list rows */
 .entry,.agent-key{display:grid;grid-template-columns:minmax(160px,260px) 1fr auto;align-items:center;gap:10px;padding:3px 8px;border-bottom:1px solid #eef2ec;min-height:28px}
 .entry{grid-template-columns:minmax(140px,1fr) minmax(160px,300px) auto}
@@ -137,3 +135,27 @@ dialog p{margin:4px 0}
 .switch:checked::after{left:16px}
 .switch:focus-visible{outline:2px solid #1f4d3a66;outline-offset:2px}
 #update-error{color:#9a3b25;word-break:break-word;user-select:text;-webkit-user-select:text}
+
+/* The KV browser keeps navigation and document values independently scrollable. */
+.kv-store{display:flex;align-items:center;gap:8px;margin:6px 0}
+.kv-store select{margin:0;max-width:360px}
+.breadcrumbs{display:flex;align-items:center;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+.breadcrumbs button{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.kv-layout{flex:1;min-height:0;display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:8px;margin-bottom:8px}
+.kv-directory,.kv-detail{min-height:0;min-width:0;display:flex;flex-direction:column}
+.kv-directory>input{margin:0 0 5px}
+#kv-folders,#kv-values{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);background:#fff}
+#kv-folders button{display:block;width:100%;text-align:left;border-radius:0;background:transparent;color:#24342f;padding:5px 8px;overflow:hidden;text-overflow:ellipsis}
+#kv-folders button:hover,#kv-folders button.active{background:#eef4ec}
+#kv-document-path{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kv-detail .section-head{gap:4px;min-height:26px}
+.kv-detail .actions button{font-size:11px;padding:3px 6px}
+#kv-values .entry{grid-template-columns:minmax(75px,1fr) minmax(120px,250px)}
+#kv-message{margin:4px 0}
+#kv-editor{width:min(650px,calc(100vw - 30px))}
+#kv-editor-json{font:12px ui-monospace,Consolas,monospace;max-height:45vh}
+.tab{padding-left:8px;padding-right:8px;font-size:11px}
+@media(max-width:680px){.kv-layout{grid-template-columns:150px minmax(0,1fr)}.kv-detail .actions{gap:2px}.kv-detail .section-head{flex-wrap:wrap}}
+
+button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-1px;animation:busy-spin .8s linear infinite}
+@keyframes busy-spin{to{transform:rotate(360deg)}}

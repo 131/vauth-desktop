@@ -14,19 +14,17 @@ import (
 
 	vauthlogin "github.com/131/vauth-login"
 
-	"github.com/131/vauth-desktop/internal/i18n"
+	"github.com/131/vauth-desktop/v2/internal/i18n"
 )
 
 const testKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl user@host"
 
 type fakeVault struct {
 	sync.Mutex
-	values    map[string]any
-	version   int64
-	keys      []any
-	policies  []any
-	wrapTTL   string
-	wrapToken string
+	values   map[string]any
+	version  int64
+	keys     []any
+	policies []any
 }
 
 func (f *fakeVault) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -72,9 +70,8 @@ func (f *fakeVault) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(body, &request)
 		f.keys = request.PublicKeys
 		w.WriteHeader(204)
-	case "POST /v1/auth/token/create":
-		f.wrapTTL = r.Header.Get("X-Vault-Wrap-TTL")
-		reply(map[string]any{"wrap_info": map[string]any{"token": "wrapped+1"}})
+	case "POST /v1/sys/capabilities-self":
+		reply(map[string]any{"capabilities": []any{"read", "create", "update", "delete", "list"}})
 	default:
 		w.WriteHeader(404)
 	}
@@ -85,13 +82,20 @@ func setup(t *testing.T) (*fakeVault, *Client) {
 	server := httptest.NewServer(vault)
 	t.Cleanup(server.Close)
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
 	t.Setenv("VAUTHRC", "")
 	t.Setenv("VAULT_ADDR", server.URL)
 	t.Setenv("VAULT_TOKEN", "user-token")
 	cwd, _ := os.Getwd()
 	os.Chdir(t.TempDir())
 	t.Cleanup(func() { os.Chdir(cwd) })
-	return vault, &Client{New: vauthlogin.New, HTTPClient: server.Client()}
+	return vault, &Client{New: func() (*vauthlogin.Vauth, error) {
+		v, err := vauthlogin.New()
+		if err == nil {
+			v.HTTPClient = server.Client()
+		}
+		return v, err
+	}}
 }
 
 func TestConnectReadWrite(t *testing.T) {
@@ -127,8 +131,8 @@ func TestRootRefused(t *testing.T) {
 	}
 }
 
-func TestSSHAndBrowse(t *testing.T) {
-	vault, client := setup(t)
+func TestSSH(t *testing.T) {
+	_, client := setup(t)
 	if _, err := client.ReadSSH(); err == nil {
 		t.Fatal("read before connect")
 	}
@@ -142,10 +146,6 @@ func TestSSHAndBrowse(t *testing.T) {
 	keys, err := client.ReadSSH()
 	if err != nil || len(keys) != 1 || keys[0] != testKey {
 		t.Fatalf("keys: %v %v", err, keys)
-	}
-	link, err := client.BrowseURL()
-	if err != nil || !strings.HasSuffix(link, "/ui/vault/auth?wrapped_token=wrapped%2B1") || vault.wrapTTL != "60s" || strings.Contains(link, "user-token") {
-		t.Fatalf("browse: %v %s %s", err, link, vault.wrapTTL)
 	}
 }
 
