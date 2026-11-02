@@ -67,7 +67,7 @@ it is not a separate Entra access token and neither `VAUTH_TOKEN` nor
 - Keep the token only in the Go session, not settings, WebView storage/DOM,
   browser URLs, disk cache, environment, logs, handoffs or diagnostics.
 - Use a separate authentication mode/session path. With the pinned
-  vauth-login v1.1.7 client, disable `TokenCache` before any lookup/request and
+  vauth-login v1.1.8 client, disable `TokenCache` before any lookup/request and
   do not call its SSH/JWT `Connect` to install or renew the SSO token. No
   environment token or cached CLI token may substitute for the SSO result.
 - Fetch the Vault entity from the token, not the local Windows username, then
@@ -146,4 +146,4 @@ material or sensitive identifiers; release remains operator-gated.
   because Vault, not the desktop, owns the confidential provider code exchange.
 - Local defining implementation: `ips/domyks/ivscs/identity/www/app.js` and
   `www/vault.js`; local adapter: `internal/vault/client.go` and the pinned
-  `github.com/131/vauth-login` v1.1.7 session/cache interfaces.
+  `github.com/131/vauth-login` v1.1.8 session/cache interfaces.

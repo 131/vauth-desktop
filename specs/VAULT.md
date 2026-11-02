@@ -26,6 +26,10 @@ pipes. Tokens share vauth-login's encrypted cache
 ([ssh-agent-crypt](https://github.com/131/ssh-agent-crypt)) and are renewed in
 the last third of their lease.
 
+The resolved `ssh_auth.role` is normalized to lowercase by vauth-login before
+authentication and cache identity calculation, regardless of its literal/macro
+source. Other fields and JWT/OIDC roles keep their original case.
+
 This mode requires an authorized public key on the user's Vault SSH role.
 **Login with SSO** supports first enrollment in the desktop instead; its token
 is kept in memory, independently of the normal SSH cache.

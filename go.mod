@@ -6,7 +6,7 @@ go 1.22
 
 require (
 	github.com/131/ssh-agent-crypt v1.4.4
-	github.com/131/vauth-login v1.1.7
+	github.com/131/vauth-login v1.1.8
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
 	golang.org/x/crypto v0.31.0
