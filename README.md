@@ -36,8 +36,11 @@ its Vault token only in memory; it does not populate the CLI token cache.
 Secret values stay hidden until revealed. Changes use explicit dialogs; display
 fields remain read-only. The workspace image uses synthetic demonstration data.
 
-The app lives in the notification area: closing the window keeps it there,
-click the icon to bring it back, right-click > Quit to exit.
+The app starts in the notification area, without a browser running. Click the
+icon (or launch the app again) to open the workspace. Closing the window destroys
+the WebView2 session and frees its browser processes; the tray and Vault session
+stay available. The next click creates a fresh window. Minimizing only hides the
+window. Right-click > Quit exits the app.
 
 ## Updates
 
@@ -75,7 +78,7 @@ Live Windows SSO/enrollment validation remains operator-confirmed.
 - [vauth-login](https://github.com/131/vauth-login) and
   [ssh-agent-crypt](https://github.com/131/ssh-agent-crypt): Vault login and
   token cache
-- [go-webview2](https://github.com/jchv/go-webview2): WebView2 window without cgo
+- [131/go-webview2](https://github.com/131/go-webview2): disposable WebView2 windows without cgo (fork of jchv/go-webview2)
 - Code signing, courtesy of Essilor International
 
 vauth-desktop is not affiliated with HashiCorp: see [CREDITS.md](CREDITS.md)

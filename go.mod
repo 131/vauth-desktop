@@ -19,3 +19,5 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 )
+
+replace github.com/jchv/go-webview2 => github.com/131/go-webview2 v0.0.0-20261102102046-8edab6d3161b
