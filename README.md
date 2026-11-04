@@ -32,9 +32,9 @@ its Vault token only in memory; it does not populate the CLI token cache.
 - **Secrets browser**: navigate accessible KV stores, reveal/copy values and
   create, edit or delete documents according to your Vault permissions. KV v2
   writes use compare-and-set; KV v1 has no equivalent protection.
-- **Wrap**: write a message, click **Wrap and copy**, send the copied token.
+- **Send (wrap) a one-time-secret**: write a message, click **Wrap and copy**, send the copied token.
   It is valid for up to five minutes and can be used only once.
-- **Unwrap**: paste a received token, click **Unwrap**, read the message.
+- **Open (unwrap) a one-time-secret**: paste a received token, click **Unwrap**, read the message.
 
 Click a key's name in the environment or KV document list to copy its name,
 independently of its hidden value.

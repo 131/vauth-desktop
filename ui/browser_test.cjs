@@ -135,6 +135,14 @@ function page(language, offline = false) {
     // Wrap has no JSON or TTL options, and unwrap is a separate text-only tab.
     await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
     assert.equal(await tab.$eval('#unwrap-panel',n=>n.hidden),true);
+    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),"Send (wrap) a one-time-secret");
+    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),"Open (unwrap) a one-time-secret");
+    assert.equal(await tab.$eval('#wrap-panel h2',n=>n.textContent),"Send (wrap) a one-time-secret");
+    assert.equal(await tab.$eval('#unwrap-panel h2',n=>n.textContent),"Open (unwrap) a one-time-secret");
+    await tab.setViewport({width:620,height:600});
+    assert.equal(await tab.evaluate(()=>[...document.querySelectorAll('nav .tab')].every(n=>n.getBoundingClientRect().right<=innerWidth)),true,'Full tab labels fit a narrow window');
+    await tab.setViewport({width:920,height:600});
+
     assert.equal(await tab.$('#wrap-mode'),null); assert.equal(await tab.$('#wrap-ttl'),null);
     const messageDraft='adhoc\ntext {"value":false}';
     await tab.type('#wrap-data',messageDraft); await click('#wrap-submit');

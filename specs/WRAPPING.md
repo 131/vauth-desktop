@@ -2,14 +2,16 @@
 
 ## Two tabs, one action each
 
-**Wrap** and **Unwrap** are separate workspace tabs, after the secrets browser.
+**Send (wrap) a one-time-secret** and **Open (unwrap) a one-time-secret** are separate workspace
+tabs, after the secrets browser. These exact labels are used in both languages,
+for the tabs and headings. Navigation wraps at narrow window widths.
 The interface and RPC contract deal only in text and tokens, not JSON documents.
 
-- **Wrap**: write any nonblank message and click **Wrap and copy**. The app creates
+- **Send (wrap) a one-time-secret**: write any nonblank message and click **Wrap and copy**. The app creates
   a single-use Vault token, displays it and copies it to the clipboard. Send
   that token to the recipient. Validity is fixed at five minutes maximum; Vault
   limits remain authoritative. There is no format or duration selector.
-- **Unwrap**: paste the received token and click **Unwrap**. Display the original
+- **Open (unwrap) a one-time-secret**: paste the received token and click **Unwrap**. Display the original
   message directly as read-only text, with a copy icon. No JSON response,
   metadata or additional reveal action is shown. The token is consumed by this
   action; it cannot be used again.
