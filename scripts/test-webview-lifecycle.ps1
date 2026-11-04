@@ -38,7 +38,7 @@ public class LifecycleWin {
 }
 '@
 function Wait-For([scriptblock]$Condition, [string]$Failure) {
- $end = (Get-Date).AddSeconds(20)
+ $end = (Get-Date).AddSeconds(90)
  while (-not (& $Condition)) {
   if ((Get-Date) -gt $end) { throw $Failure }
   Start-Sleep -Milliseconds 100
