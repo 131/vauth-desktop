@@ -18,10 +18,10 @@ The signed-in workspace has five tabs, in this order:
 2. **SSH Keys**: agent-key selection and publication, including first enrollment
    after SSO.
 3. **Secrets browser**: embedded browser/editor for user-accessible KV mounts.
-4. **Send (wrap) a one-time-secret**: write a message and create/copy its single-use token.
-5. **Open (unwrap) a one-time-secret**: paste a token and read the original message directly.
+4. **Send (wrap) a secret**: write a message and create/copy its single-use token.
+5. **Open (unwrap) a secret**: paste a token and read the original message directly.
 
-Both message tabs use one large primary action without JSON input. Wrap offers
+Both message tabs use one compact primary action without JSON input. Wrap offers
 a lifetime dropdown (15 min, 6 h, 72 h); token fields are single-line and the
 recovered secret uses a read-only textarea;
 see [WRAPPING.md](WRAPPING.md). Click an environment/KV field name to copy its

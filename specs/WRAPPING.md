@@ -2,23 +2,26 @@
 
 ## Two tabs, one action each
 
-**Send (wrap) a one-time-secret** and **Open (unwrap) a one-time-secret** are separate workspace
+**Send (wrap) a secret** and **Open (unwrap) a secret** are separate workspace
 tabs, after the secrets browser. These exact labels are used in both languages,
 for the tabs and headings. Navigation wraps at narrow window widths.
 The interface and RPC contract deal only in text and tokens, not JSON documents.
 
-- **Send (wrap) a one-time-secret**: write any nonblank message and click **Wrap and copy**. The app creates
+- **Send (wrap) a secret**: write any nonblank message and click **Wrap your secret into a one-time-token**. The app creates
   a single-use Vault token, displays it and copies it to the clipboard. Send
   that token to the recipient. The lifetime dropdown offers **15 min** (default),
   **6 h** and **72 h**. Vault policies remain authoritative and can refuse a
   selected lifetime. There is no JSON format selector.
-- **Open (unwrap) a one-time-secret**: paste the received token and click **Unwrap**. Display the original
+- **Open (unwrap) a secret**: paste the received token and click **Unwrap your one-time-token**. Display the original
   message directly as read-only text, with a copy icon. No JSON response,
   metadata or additional reveal action is shown. The token is consumed by this
   action; it cannot be used again.
 - Token input/output are single-line text fields. The secret to send and the
   recovered secret use textareas, with recovered text read-only.
-- Both forms have one large primary button. Output copy icons allow copying
+- The TTL dropdown precedes the send textarea. Both textareas grow with the
+  window in both dimensions instead of remaining fixed-size/manual-resize.
+  Input tokens are labeled **Token to open**, output tokens **Your one-time-token**.
+- Both forms have one compact primary button. Output copy icons allow copying
   again without issuing or consuming another token. A clipboard failure after
   wrapping retains the issued token for manual copying.
 - Failed requests preserve the input and a previously issued wrapping token.

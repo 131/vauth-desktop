@@ -160,19 +160,22 @@ dialog p{margin:4px 0}
 button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-1px;animation:busy-spin .8s linear infinite}
 @keyframes busy-spin{to{transform:rotate(360deg)}}
 
-/* One message, one primary action per tab. */
-.message-panel{overflow:auto;gap:8px}
-.message-panel form{width:100%;max-width:700px}
-.message-panel label{display:block;margin:6px 0}
-.message-panel textarea{font:14px "Segoe UI",system-ui,sans-serif;resize:vertical}
-.message-action{width:100%;padding:16px;font-size:18px;font-weight:700}
-#wrap-created,#unwrap-result{position:relative;width:100%;max-width:700px}
-#wrap-created>.tool,#unwrap-result>.tool{position:absolute;right:8px;top:30px}
+/* Message editors fill the available width/height; actions stay compact. */
+.message-panel{overflow:hidden;gap:8px;padding-bottom:8px}
+.message-panel>h2,.message-panel>.muted{flex:none}
+.message-panel form{display:flex;flex-direction:column;gap:8px;width:100%;min-height:0}
+#wrap-form{flex:1}
+#unwrap-form{flex:none}
+.message-panel label{display:block;margin:0}
+.message-panel .message-text{display:flex;flex-direction:column;gap:3px;flex:1;min-height:70px}
+.message-text textarea{flex:1;min-height:0;height:0;margin:0;width:100%;font:14px "Segoe UI",system-ui,sans-serif;resize:none}
+.message-action{align-self:flex-start;flex:none}
+#wrap-created{position:relative;flex:none}
+#unwrap-result{position:relative;display:flex;flex-direction:column;flex:1;min-height:0}
+#wrap-created>.tool,#unwrap-result>.tool{position:absolute;right:6px;top:24px}
 #wrap-token,#unwrap-data{padding-right:36px}
 .entry .key-name{display:block;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:none;color:inherit;text-align:left;font:inherit;font-family:ui-monospace,Consolas,monospace;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:text;-webkit-user-select:text}
 .entry .key-name:hover{text-decoration:underline;color:var(--accent)}
-
-.message-panel .wrap-duration{display:flex;align-items:center;gap:10px;margin:10px 0}
+.message-panel .wrap-duration{display:flex;align-items:center;gap:10px;flex:none}
 .wrap-duration select{padding:5px 24px 5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:inherit;font:inherit}
 #wrap-token,#unwrap-token{font:13px ui-monospace,Consolas,monospace;height:30px}
-#wrap-created>.tool{top:28px}

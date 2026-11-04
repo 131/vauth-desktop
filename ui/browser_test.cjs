@@ -135,10 +135,10 @@ function page(language, offline = false) {
     // Wrap has a TTL dropdown but no JSON options; unwrap is a separate text-only tab.
     await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
     assert.equal(await tab.$eval('#unwrap-panel',n=>n.hidden),true);
-    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),"Send (wrap) a one-time-secret");
-    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),"Open (unwrap) a one-time-secret");
-    assert.equal(await tab.$eval('#wrap-panel h2',n=>n.textContent),"Send (wrap) a one-time-secret");
-    assert.equal(await tab.$eval('#unwrap-panel h2',n=>n.textContent),"Open (unwrap) a one-time-secret");
+    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),"Send (wrap) a secret");
+    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),"Open (unwrap) a secret");
+    assert.equal(await tab.$eval('#wrap-panel h2',n=>n.textContent),"Send (wrap) a secret");
+    assert.equal(await tab.$eval('#unwrap-panel h2',n=>n.textContent),"Open (unwrap) a secret");
     await tab.setViewport({width:620,height:600});
     assert.equal(await tab.evaluate(()=>[...document.querySelectorAll('nav .tab')].every(n=>n.getBoundingClientRect().right<=innerWidth)),true,'Full tab labels fit a narrow window');
     await tab.setViewport({width:920,height:600});
@@ -149,6 +149,18 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#wrap-token',n=>n.tagName),'INPUT');
     assert.equal(await tab.$eval('#unwrap-token',n=>n.tagName),'INPUT');
     assert.equal(await tab.$eval('#unwrap-data',n=>n.tagName),'TEXTAREA');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),"Wrap your secret into a one-time-token");
+    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),"Unwrap your one-time-token");
+    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Your one-time-token');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Token to open');
+    assert.equal(await tab.evaluate(()=>document.getElementById('wrap-ttl').getBoundingClientRect().bottom < document.getElementById('wrap-data').getBoundingClientRect().top),true,'TTL precedes the textarea');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.getBoundingClientRect().height<=32),true,'Classic button height');
+    const editorBefore=await tab.$eval('#wrap-data',n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height}));
+    await tab.setViewport({width:1100,height:760});
+    const editorAfter=await tab.$eval('#wrap-data',n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height}));
+    assert.ok(editorAfter.width>editorBefore.width+150 && editorAfter.height>editorBefore.height+120,'Send editor fills both dimensions');
+    await tab.setViewport({width:920,height:600});
+
     const messageDraft='adhoc\ntext {"value":false}';
     await tab.type('#wrap-data',messageDraft); await click('#wrap-submit');
     await tab.waitForSelector('#wrap-created:not([hidden])');
@@ -182,6 +194,12 @@ function page(language, offline = false) {
     await tab.waitForSelector('#unwrap-result:not([hidden])');
     assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'synthetic-unwrapped-text','Plain message, no JSON or reveal step');
     assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'');
+    const readBefore=await tab.$eval('#unwrap-data',n=>n.getBoundingClientRect().height);
+    await tab.setViewport({width:1100,height:760});
+    assert.ok(await tab.$eval('#unwrap-data',n=>n.getBoundingClientRect().height)>readBefore+120,'Read textarea fills height');
+    assert.equal(await tab.evaluate(()=>{const field=document.getElementById('unwrap-data').getBoundingClientRect(),panel=document.getElementById('unwrap-panel').getBoundingClientRect();return Math.abs(field.left-panel.left)<1 && Math.abs(field.right-panel.right)<1 && Math.abs(field.bottom-panel.bottom)<12}),true,'Read textarea anchors left/right/bottom');
+    await tab.setViewport({width:920,height:600});
+
     await click('#unwrap-copy'); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-unwrapped-text');
     await tab.type('#unwrap-token','already-used'); await tab.evaluate(()=>window.testState.unwrapError=true);
     await click('#unwrap-submit'); await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
