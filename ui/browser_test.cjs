@@ -13,7 +13,7 @@ function page(language, offline = false) {
   let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace(/\{\{([^}]+)\}\}/g, (_, key) => escape(catalog[key]));
   html = html.replace('<link rel="stylesheet" href="style.css">', '<style>' + fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8') + '</style>');
   const mock = `
-  window.I18N = ${JSON.stringify({language, languages: [{value:'fr-fr', label:'Français'}, {value:'en-us', label:'English'}], messages: catalog})};
+  window.I18N = ${JSON.stringify({language, languages: Object.keys(messages), messages: catalog})};
   // Older development Chromium lacks popovers; only the notification host is shimmed.
   if (!HTMLElement.prototype.showPopover) {
     HTMLElement.prototype.showPopover = function() {this.setAttribute('data-open', 'true')};
@@ -63,7 +63,7 @@ function page(language, offline = false) {
 }
 
 (async () => {
-  const server = http.createServer((req,res) => {res.setHeader('Content-Type','text/html; charset=utf-8');res.end(page(req.url.includes('fr')?'fr-fr':'en-us',req.url.includes('offline')))});
+  const server = http.createServer((req,res) => {res.setHeader('Content-Type','text/html; charset=utf-8');res.end(page(req.url.includes('/zh')?'zh-cn':req.url.includes('fr')?'fr-fr':'en-us',req.url.includes('offline')))});
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
   let browser;
   try {
@@ -227,10 +227,10 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#sso-login',node=>node.textContent),'Login with SSO');
     await click('#secrets-tab'); await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===4);
     assert.equal(await tab.$eval('#add',node=>node.disabled),true);
-    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),'Envoyer un secret');
-    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'Ouvrir un secret');
-    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer un token à usage unique pour votre secret');
-    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir votre token à usage unique');
+    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),'Envoyer (wrap) un secret');
+    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'Ouvrir (unwrap) un secret');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer (wrap) un token à usage unique pour votre secret');
+    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir (unwrap) votre token à usage unique');
     assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Votre token à usage unique');
     assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Token à ouvrir');
     await click('#wrap-tab');
@@ -271,6 +271,29 @@ function page(language, offline = false) {
         await tab.waitForSelector('#unwrap-result:not([hidden])'); await tab.screenshot({path:process.env.UI_UNWRAP_FR_SCREENSHOT});
       }
     }
+    // Chinese is selectable and renders a complete, working secret-sharing UI.
+    await tab.goto('http://127.0.0.1:'+server.address().port+'/zh');
+    await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
+    assert.equal(await tab.$eval('html',n=>n.lang),'zh-CN');
+    assert.deepEqual(await tab.$$eval('#language option',nodes=>nodes.map(n=>[n.value,n.textContent])),[['fr-fr','Français'],['en-us','English'],['zh-cn','简体中文']]);
+    await click('#wrap-tab');
+    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),'发送 (wrap) 机密');
+    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'打开 (unwrap) 机密');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'为您的机密创建 (wrap) 一次性 token');
+    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'打开 (unwrap) 您的一次性 token');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.disabled),true);
+    await tab.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}})});
+    await tab.type('#wrap-data','用于测试的机密'); await click('#wrap-submit');
+    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'用于测试的机密');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
+    await tab.evaluate(()=>document.querySelectorAll('#toasts .toast .tool').forEach(button=>button.click()));
+    await tab.setViewport({width:920,height:600});
+    if (process.env.UI_WRAP_ZH_SCREENSHOT) await tab.screenshot({path:process.env.UI_WRAP_ZH_SCREENSHOT});
+    await click('#unwrap-tab'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
+    await tab.waitForSelector('#unwrap-result:not([hidden])');
+    assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'synthetic-unwrapped-text');
+    if (process.env.UI_UNWRAP_ZH_SCREENSHOT) await tab.screenshot({path:process.env.UI_UNWRAP_ZH_SCREENSHOT});
     assert.deepEqual(errors,[],'Browser script errors');
     console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');
   } finally {if(browser) await browser.close();await new Promise(resolve=>server.close(resolve))}

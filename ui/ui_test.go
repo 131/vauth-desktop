@@ -23,7 +23,7 @@ func TestPage(t *testing.T) {
 
 func TestEveryPlaceholderTranslated(t *testing.T) {
 	html, _ := assets.ReadFile("index.html")
-	for _, language := range []string{"fr-fr", "en-us"} {
+	for _, language := range i18n.Languages {
 		for _, match := range regexp.MustCompile(`\{\{([^}]+)\}\}`).FindAllStringSubmatch(string(html), -1) {
 			if _, ok := i18n.Messages(language)[match[1]]; !ok {
 				t.Errorf("%s missing placeholder %s", language, match[1])
@@ -87,7 +87,7 @@ func TestTokenWrapLanguageAndTerminology(t *testing.T) {
 	if !strings.Contains(spec, "## Language & terminology") {
 		t.Fatal("terminology section missing")
 	}
-	english, french := i18n.Messages("en-us"), i18n.Messages("fr-fr")
+	english, french, chinese := i18n.Messages("en-us"), i18n.Messages("fr-fr"), i18n.Messages("zh-cn")
 	for key, value := range french {
 		if strings.Contains(strings.ToLower(value), "jeton") {
 			t.Errorf("%s: fr-fr must retain the term token", key)
@@ -97,7 +97,7 @@ func TestTokenWrapLanguageAndTerminology(t *testing.T) {
 		if english[key] == french[key] {
 			t.Errorf("%s: French still uses English wording", key)
 		}
-		if !strings.Contains(spec, "| "+english[key]+" | "+french[key]+" |") {
+		if !strings.Contains(spec, "| "+english[key]+" | "+french[key]+" | "+chinese[key]+" |") {
 			t.Errorf("%s: terminology table and catalog differ", key)
 		}
 	}

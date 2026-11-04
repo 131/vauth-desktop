@@ -37,7 +37,7 @@ the developer tools. WebView2 data lives in the user cache directory
 
 ## Translations
 
-`internal/i18n/messages.json` holds `fr-fr` (default) and `en-us`. Go uses
+`internal/i18n/messages.json` holds `fr-fr` (default), `en-us` and `zh-cn` (Simplified Chinese). Go uses
 `i18n.T` / `i18n.Errorf`; the page gets the catalog as `window.I18N` and
 `{{key}}` placeholders in `ui/index.html`. Tests check that both catalogs have
 the same keys and that every key used exists.
@@ -67,7 +67,9 @@ access, text-only wrapping, automatic token copy, separate single-use unwrap, pl
 message output, TTL choices, single-line tokens, copied key names, retained
 drafts and reconnect clearing. The older development Chromium uses a notification-popover shim and
 programmatic clicks; this does not replace a native Windows/WebView2 test.
-`UI_SCREENSHOT` optionally captures a synthetic workspace preview.
+`UI_SCREENSHOT` optionally captures a synthetic workspace preview. Chinese
+screenshot rendering requires a CJK font on the development host; use an
+existing system font rather than bundling fonts with the application.
 
 Go tests reject internal operator/organization identifiers in repository content.
 Before release, additionally scan the executable as UTF-8 and UTF-16 text, then

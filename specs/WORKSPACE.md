@@ -28,9 +28,9 @@ see [TOKEN_WRAP.md](TOKEN_WRAP.md). Click an environment/KV field name to copy i
 name without revealing or copying its value.
 
 Use the operator-selected en-us labels and order, including “Environnement”.
-Secret-sharing controls have natural fr-fr translations defined in
+Secret-sharing controls have fr-fr/zh-cn translations defined in
 [TOKEN_WRAP.md](TOKEN_WRAP.md#language--terminology); other previously selected
-workspace labels remain unchanged. All controls are catalog-backed.
+workspace labels in existing locales remain unchanged. All controls are catalog-backed.
 The environment includes the profile. Authentication and release links can
 open the system browser; KV browsing/editing is embedded in the desktop.
 

@@ -410,7 +410,7 @@ $('channel').addEventListener('change', () => run($('channel'), async () => {
   if (!release.available) notice(t('update.channel.selected', release.channel, release.latest || t('update.none')));
 }));
 // The language applies at once: Go renders the page again.
-const languageNames = {'fr-fr': 'Français', 'en-us': 'English'};
+const languageNames = {'fr-fr': 'Français', 'en-us': 'English', 'zh-cn': '简体中文'};
 $('language').replaceChildren(...window.I18N.languages.map(name => new Option(languageNames[name] || name, name, false, name === window.I18N.language)));
 $('language').addEventListener('change', () => run($('language'), () => call('set_language', $('language').value)));
 })();

@@ -13,7 +13,7 @@ import (
 const Default = "fr-fr"
 
 // Languages lists the supported languages, default first.
-var Languages = []string{"fr-fr", "en-us"}
+var Languages = []string{"fr-fr", "en-us", "zh-cn"}
 
 //go:embed messages.json
 var raw []byte

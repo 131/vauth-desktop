@@ -65,3 +65,16 @@ func TestWrappingArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestSetChineseLanguage(t *testing.T) {
+	defer i18n.Set(i18n.Default)
+	reloads := 0
+	app := &App{Settings: &settings.Store{Path: filepath.Join(t.TempDir(), "settings.yml")}, Reload: func() { reloads++ }}
+	if _, err := app.Handle("set_language", []json.RawMessage{json.RawMessage(`"zh-cn"`)}); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := app.Settings.Load()
+	if err != nil || saved.Language != "zh-cn" || i18n.Current() != "zh-cn" || reloads != 1 {
+		t.Fatalf("%+v %v %d", saved, err, reloads)
+	}
+}

@@ -37,7 +37,7 @@ remote_channels:
 
 | Key | Default | Configurable in UI | |
 |-----|---------|:------------------:|-|
-| `language` | `fr-fr` | yes | `fr-fr` or `en-us`, for the window, notifications, errors and tray menu; applied at once. Unknown values fall back to `fr-fr`. |
+| `language` | `fr-fr` | yes | `fr-fr`, `en-us` or `zh-cn` (简体中文), for the window, notifications, errors and tray menu; applied at once. Unknown values fall back to `fr-fr`. |
 | `update.channel` | `production` | yes | Channel followed, one of the manifest keys. An unknown channel falls back to `production`. |
 | `update.enable` | `true` | yes | *Automatic updates* checkbox. `false` disables auto-update: no request to GitHub, channel and check are hidden. |
 | `update.upstream` | `https://github.com/131/vauth-desktop` | no | GitHub repository providing `manifest.json` and the releases, `https://github.com/<owner>/<repo>`. Shown in the settings panel. |
