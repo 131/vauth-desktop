@@ -161,18 +161,24 @@ function page(language, offline = false) {
     assert.ok(editorAfter.width>editorBefore.width+150 && editorAfter.height>editorBefore.height+120,'Send editor fills both dimensions');
     await tab.setViewport({width:920,height:600});
 
+    assert.equal(await tab.$eval('#wrap-created',n=>n.hidden),false,'Token area is reserved before wrapping');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.disabled && n.readOnly),true);
+    assert.equal(await tab.$eval('#wrap-copy',n=>n.disabled),true);
+    const geometryBefore=await tab.evaluate(()=>['wrap-data','wrap-submit','wrap-token'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return [r.top,r.left,r.width,r.height]}));
     const messageDraft='adhoc\ntext {"value":false}';
     await tab.type('#wrap-data',messageDraft); await click('#wrap-submit');
-    await tab.waitForSelector('#wrap-created:not([hidden])');
-    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    await tab.waitForFunction(()=>!document.getElementById('wrap-token').disabled && !document.getElementById('wrap-submit').disabled);
     const wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
     assert.deepEqual(wrapped.args,[messageDraft,900],'Plain text and selected TTL; JSON-like text is literal');
-    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'');
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),messageDraft,'Wrapping preserves the secret draft');
     assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
+    assert.equal(await tab.$eval('#wrap-token',n=>!n.disabled && n.readOnly),true);
+    assert.deepEqual(await tab.evaluate(()=>['wrap-data','wrap-submit','wrap-token'].map(id=>{const r=document.getElementById(id).getBoundingClientRect();return [r.top,r.left,r.width,r.height]})),geometryBefore,'No layout shift after wrapping');
+
     assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-wrapping-token','Wrap copies automatically');
     assert.equal(await tab.evaluate(()=>window.testState.trace.some(x=>x.method==='unwrap')),false,'No automatic unwrap');
     for(const duration of ['21600','259200']) {
-      await tab.select('#wrap-ttl',duration); await tab.type('#wrap-data','TTL test'); await click('#wrap-submit');
+      await tab.select('#wrap-ttl',duration); await tab.$eval('#wrap-data',n=>n.value='TTL test'); await click('#wrap-submit');
       await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
       assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop().args[1]),Number(duration));
     }
@@ -187,6 +193,7 @@ function page(language, offline = false) {
     await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
     assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
     assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length),beforeCopyFailure+1);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'clipboard failure','Secret is retained after clipboard failure');
     await tab.evaluate(()=>{navigator.clipboard.writeText=async text=>window.testCopied.push(text);document.execCommand=window.savedExecCommand});
     await click('#unwrap-tab'); await tab.waitForSelector('#unwrap-panel:not([hidden])');
     assert.equal(await tab.$eval('#wrap-panel',n=>n.hidden),true);
@@ -206,10 +213,13 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true);
     assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'already-used');
     // Reconnect clears both forms; late responses from the prior session are ignored.
+    await tab.evaluate(()=>{window.copyDone=false;navigator.clipboard.writeText=()=>new Promise(resolve=>setTimeout(()=>{window.copyDone=true;resolve()},160));document.getElementById('wrap-copy').click()});
     await tab.evaluate(()=>{window.testState.unwrapError=false;window.testState.unwrapSlow=true;document.getElementById('unwrap-token').value='late';document.getElementById('unwrap-form').dispatchEvent(new Event('submit',{cancelable:true}))});
     await click('#reconnect'); await tab.waitForSelector('#secrets-panel:not([hidden])');
-    await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
+    await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled && window.copyDone);
     for(const id of ['wrap-data','wrap-token','unwrap-token','unwrap-data']) assert.equal(await tab.$eval('#'+id,n=>n.value),'');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.disabled),true); assert.equal(await tab.$eval('#wrap-copy',n=>n.disabled),true);
+    assert.equal(await tab.$eval('#wrap-created',n=>n.hidden),false);
     // SSO can reach first-enrollment UI even with no database permission.
     await tab.goto('http://127.0.0.1:'+server.address().port+'/fr?offline');
     await tab.evaluate(()=>window.testState.readError=true); await click('#sso-login');
@@ -217,6 +227,20 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#sso-login',node=>node.textContent),'Login with SSO');
     await click('#secrets-tab'); await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===4);
     assert.equal(await tab.$eval('#add',node=>node.disabled),true);
+    assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),'Envoyer un secret');
+    assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'Ouvrir un secret');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer un jeton à usage unique pour votre secret');
+    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir votre jeton à usage unique');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Votre jeton à usage unique');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Jeton à ouvrir');
+    await click('#wrap-tab');
+    await tab.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}})});
+    await tab.type('#wrap-data','Un secret synthétique'); await click('#wrap-submit');
+    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'Un secret synthétique');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
+
+
     if (process.env.UI_SCREENSHOT) {
       await tab.goto('http://127.0.0.1:'+server.address().port+'/en');
       await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
@@ -226,11 +250,26 @@ function page(language, offline = false) {
       await tab.goto('http://127.0.0.1:'+server.address().port+'/en');
       await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
       await click('#wrap-tab'); await tab.type('#wrap-data','A temporary password to share'); await click('#wrap-submit');
-      await tab.waitForSelector('#wrap-created:not([hidden])'); await click('#unwrap-tab'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
+      await tab.waitForFunction(()=>!document.getElementById('wrap-token').disabled && !document.getElementById('wrap-submit').disabled); await click('#unwrap-tab'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
       await tab.waitForSelector('#unwrap-result:not([hidden])');
       await tab.evaluate(()=>document.querySelectorAll('#toasts .toast .tool').forEach(button=>button.click()));
       await tab.setViewport({width:920,height:600}); await click('#wrap-tab'); await tab.screenshot({path:process.env.UI_WRAP_SCREENSHOT});
       await click('#unwrap-tab'); if(process.env.UI_UNWRAP_SCREENSHOT) await tab.screenshot({path:process.env.UI_UNWRAP_SCREENSHOT});
+    }
+    if (process.env.UI_WRAP_FR_SCREENSHOT) {
+      await tab.goto('http://127.0.0.1:'+server.address().port+'/fr');
+      await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
+      await click('#wrap-tab'); await tab.type('#wrap-data','Un secret temporaire à transmettre');
+      await tab.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}})});
+      await tab.setViewport({width:920,height:600});
+      if (process.env.UI_WRAP_EMPTY_SCREENSHOT) await tab.screenshot({path:process.env.UI_WRAP_EMPTY_SCREENSHOT});
+      await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-token').disabled && !document.getElementById('wrap-submit').disabled);
+      await tab.evaluate(()=>document.querySelectorAll('#toasts .toast .tool').forEach(button=>button.click()));
+      await tab.screenshot({path:process.env.UI_WRAP_FR_SCREENSHOT});
+      if (process.env.UI_UNWRAP_FR_SCREENSHOT) {
+        await click('#unwrap-tab'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
+        await tab.waitForSelector('#unwrap-result:not([hidden])'); await tab.screenshot({path:process.env.UI_UNWRAP_FR_SCREENSHOT});
+      }
     }
     assert.deepEqual(errors,[],'Browser script errors');
     console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');

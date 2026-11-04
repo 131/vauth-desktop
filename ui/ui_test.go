@@ -77,3 +77,23 @@ func TestEveryScriptKeyExists(t *testing.T) {
 		}
 	}
 }
+
+func TestTokenWrapLanguageAndTerminology(t *testing.T) {
+	data, err := os.ReadFile("../specs/TOKEN_WRAP.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := string(data)
+	if !strings.Contains(spec, "## Language & terminology") {
+		t.Fatal("terminology section missing")
+	}
+	english, french := i18n.Messages("en-us"), i18n.Messages("fr-fr")
+	for _, key := range []string{"tab.wrap", "tab.unwrap", "wrap.submit", "wrap.unwrap", "wrap.token", "unwrap.token", "wrap.data", "wrap.result", "wrap.ttl", "wrap.copy.data"} {
+		if english[key] == french[key] {
+			t.Errorf("%s: French still uses English wording", key)
+		}
+		if !strings.Contains(spec, "| "+english[key]+" | "+french[key]+" |") {
+			t.Errorf("%s: terminology table and catalog differ", key)
+		}
+	}
+}

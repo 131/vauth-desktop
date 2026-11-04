@@ -32,9 +32,9 @@ its Vault token only in memory; it does not populate the CLI token cache.
 - **Secrets browser**: navigate accessible KV stores, reveal/copy values and
   create, edit or delete documents according to your Vault permissions. KV v2
   writes use compare-and-set; KV v1 has no equivalent protection.
-- **Send (wrap) a secret**: write a message, click **Wrap your secret into a one-time-token**, send the copied token.
+- **Send (wrap) a secret**: write a secret, click **Wrap your secret into a one-time-token**, send the copied token.
   Choose 15 minutes, 6 hours or 72 hours of validity; it can be used only once.
-- **Open (unwrap) a secret**: paste a received token, click **Unwrap your one-time-token**, read the message.
+- **Open (unwrap) a secret**: paste a received token, click **Unwrap your one-time-token**, read the secret.
 
 Click a key's name in the environment or KV document list to copy its name,
 independently of its hidden value.
@@ -73,7 +73,7 @@ only kept in memory while the app runs.
 [Settings](specs/SETTINGS.md), [releases and auto-update](specs/RELEASES.md),
 [Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md).
 
-[Wrapping](specs/WRAPPING.md), [workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
+[Wrapping](specs/TOKEN_WRAP.md), [workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
 Version 2.0.0 introduces the workspace and SSO enrollment flow.
 Live Windows SSO/enrollment validation remains operator-confirmed.
 

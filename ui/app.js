@@ -308,7 +308,7 @@ let wrappingEpoch = 0;
 function clearWrapping() {
   wrappingEpoch++;
   for (const id of ['wrap-data', 'wrap-token', 'unwrap-token', 'unwrap-data']) $(id).value = '';
-  $('wrap-created').hidden = true; $('unwrap-result').hidden = true;
+  $('wrap-token').disabled = true; $('wrap-copy').disabled = true; $('unwrap-result').hidden = true;
 }
 $('wrap-form').addEventListener('submit', event => {
   event.preventDefault(); run($('wrap-submit'), async () => {
@@ -316,14 +316,13 @@ $('wrap-form').addEventListener('submit', event => {
     if (!draft.trim()) throw new Error(t('err.wrap.text'));
     const token = await call('wrap', draft, Number($('wrap-ttl').value));
     if (epoch !== wrappingEpoch || auth !== authEpoch) return;
-    $('wrap-token').value = token; $('wrap-created').hidden = false;
-    if ($('wrap-data').value === draft) $('wrap-data').value = '';
+    $('wrap-token').value = token; $('wrap-token').disabled = false; $('wrap-copy').disabled = false;
     // Show the issued token before copying: a clipboard failure must not lose it.
     await copy(token); notice(t('wrap.done'));
   });
 });
 $('wrap-copy').append(icon('copy'));
-$('wrap-copy').addEventListener('click', () => run($('wrap-copy'), () => copy($('wrap-token').value)));
+$('wrap-copy').addEventListener('click', () => run($('wrap-copy'), () => copy($('wrap-token').value)).finally(() => { $('wrap-copy').disabled = !$('wrap-token').value; }));
 $('unwrap-form').addEventListener('submit', event => {
   event.preventDefault(); run($('unwrap-submit'), async () => {
     const epoch = wrappingEpoch, auth = authEpoch, token = $('unwrap-token').value.trim();

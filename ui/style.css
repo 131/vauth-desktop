@@ -179,3 +179,7 @@ button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin
 .message-panel .wrap-duration{display:flex;align-items:center;gap:10px;flex:none}
 .wrap-duration select{padding:5px 24px 5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:inherit;font:inherit}
 #wrap-token,#unwrap-token{font:13px ui-monospace,Consolas,monospace;height:30px}
+
+/* Reserve the read-only token area before generation, without layout shifts. */
+#wrap-token{background:#eef2ee}
+#wrap-token:disabled{color:#829086;opacity:1}

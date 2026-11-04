@@ -69,7 +69,7 @@ SSH/JWT `Connect` or read/write the CLI cache; see
 the page, settings, logs or URLs containing a Vault credential.
 
 Vault calls run in Go; [WORKSPACE.md](WORKSPACE.md) defines the list/editor UI.
-Response wrapping is defined in [WRAPPING.md](WRAPPING.md). Wrapping tokens are
+Response wrapping is defined in [TOKEN_WRAP.md](TOKEN_WRAP.md). Wrapping tokens are
 explicit user input/output in the page, unlike the Go-only authentication token.
 
 ### Operator profile verification — October 27, 2026
