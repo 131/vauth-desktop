@@ -3,6 +3,7 @@ package vault
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -38,7 +39,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 		calls++
 		switch r.URL.Path {
 		case "/v1/sys/wrapping/wrap":
-			if r.Method != "POST" || r.Header.Get("X-Vault-Token") != "session-token" || r.Header.Get("X-Vault-Wrap-TTL") != "300" {
+			if r.Method != "POST" || r.Header.Get("X-Vault-Token") != "session-token" || r.Header.Get("X-Vault-Wrap-TTL") != "900" {
 				t.Error("wrong wrap request")
 			}
 			if err := json.NewDecoder(r.Body).Decode(&stored); err != nil {
@@ -47,7 +48,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 			if len(stored) != 1 || stored["value"] != text {
 				t.Error("payload types changed")
 			}
-			json.NewEncoder(w).Encode(map[string]any{"wrap_info": map[string]any{"token": "single-use", "ttl": 300, "creation_time": "2026-11-04T10:00:00Z", "creation_path": "sys/wrapping/wrap"}})
+			json.NewEncoder(w).Encode(map[string]any{"wrap_info": map[string]any{"token": "single-use", "ttl": 900, "creation_time": "2026-11-04T10:00:00Z", "creation_path": "sys/wrapping/wrap"}})
 		case "/v1/sys/wrapping/unwrap":
 			body, _ := io.ReadAll(r.Body)
 			if r.Method != "POST" || r.Header.Get("X-Vault-Token") != "single-use" || len(body) != 0 || r.Header.Get("X-Vault-Wrap-TTL") != "" {
@@ -65,7 +66,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 		}
 	})
 	originalHTTP := client.vauth.HTTPClient
-	token, err := client.Wrap(text)
+	token, err := client.Wrap(text, 900)
 	if err != nil || token != "single-use" {
 		t.Fatalf("wrap: %+v %v", token, err)
 	}
@@ -90,7 +91,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 func TestWrappingValidationAndFailures(t *testing.T) {
 	client := &Client{}
 	for _, text := range []string{"", " \n\t"} {
-		if _, err := client.Wrap(text); err == nil {
+		if _, err := client.Wrap(text, 900); err == nil {
 			t.Fatal("blank message accepted")
 		}
 	}
@@ -115,7 +116,7 @@ func TestWrappingValidationAndFailures(t *testing.T) {
 			if status == 403 {
 				return
 			}
-			if _, err := client.Wrap("message"); err == nil {
+			if _, err := client.Wrap("message", 900); err == nil {
 				t.Fatal("wrap status ignored")
 			}
 		})
@@ -123,7 +124,7 @@ func TestWrappingValidationAndFailures(t *testing.T) {
 	for _, body := range []string{`not-json`, `{}`, `{"wrap_info":null}`, `{"wrap_info":{"token":"x","ttl":0}}`} {
 		t.Run(body, func(t *testing.T) {
 			client := wrappingClient(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, body) })
-			if _, err := client.Wrap("message"); err == nil {
+			if _, err := client.Wrap("message", 900); err == nil {
 				t.Fatal("invalid response accepted")
 			}
 		})
@@ -169,7 +170,7 @@ func TestWrapDeniedWithValidSession(t *testing.T) {
 		}
 		w.WriteHeader(403)
 	})
-	if _, err := client.Wrap("message"); err == nil {
+	if _, err := client.Wrap("message", 900); err == nil {
 		t.Fatal("denied wrap accepted")
 	}
 	if calls != 2 {
@@ -185,7 +186,29 @@ func TestWrapPreservesRedirectPolicy(t *testing.T) {
 		http.Redirect(w, r, "/forbidden", http.StatusTemporaryRedirect)
 	})
 	client.vauth.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	if _, err := client.Wrap("message"); err == nil {
+	if _, err := client.Wrap("message", 900); err == nil {
 		t.Fatal("redirect accepted")
+	}
+}
+
+func TestWrapTTLChoices(t *testing.T) {
+	for _, ttl := range []int{900, 21600, 259200} {
+		t.Run(fmt.Sprint(ttl), func(t *testing.T) {
+			client := wrappingClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != "/v1/sys/wrapping/wrap" || r.Header.Get("X-Vault-Wrap-TTL") != fmt.Sprint(ttl) {
+					t.Error("wrong TTL request")
+				}
+				json.NewEncoder(w).Encode(map[string]any{"wrap_info": map[string]any{"token": "one-use", "ttl": ttl}})
+			})
+			token, err := client.Wrap("secret", ttl)
+			if err != nil || token != "one-use" {
+				t.Fatalf("%s %v", token, err)
+			}
+		})
+	}
+	for _, ttl := range []int{-1, 0, 300, 3600, 259201} {
+		if _, err := (&Client{}).Wrap("secret", ttl); err == nil {
+			t.Fatal("unsupported TTL accepted", ttl)
+		}
 	}
 }

@@ -314,7 +314,7 @@ $('wrap-form').addEventListener('submit', event => {
   event.preventDefault(); run($('wrap-submit'), async () => {
     const epoch = wrappingEpoch, auth = authEpoch, draft = $('wrap-data').value;
     if (!draft.trim()) throw new Error(t('err.wrap.text'));
-    const token = await call('wrap', draft);
+    const token = await call('wrap', draft, Number($('wrap-ttl').value));
     if (epoch !== wrappingEpoch || auth !== authEpoch) return;
     $('wrap-token').value = token; $('wrap-created').hidden = false;
     if ($('wrap-data').value === draft) $('wrap-data').value = '';

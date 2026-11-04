@@ -171,3 +171,8 @@ button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin
 #wrap-token,#unwrap-data{padding-right:36px}
 .entry .key-name{display:block;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:none;color:inherit;text-align:left;font:inherit;font-family:ui-monospace,Consolas,monospace;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:text;-webkit-user-select:text}
 .entry .key-name:hover{text-decoration:underline;color:var(--accent)}
+
+.message-panel .wrap-duration{display:flex;align-items:center;gap:10px;margin:10px 0}
+.wrap-duration select{padding:5px 24px 5px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;color:inherit;font:inherit}
+#wrap-token,#unwrap-token{font:13px ui-monospace,Consolas,monospace;height:30px}
+#wrap-created>.tool{top:28px}

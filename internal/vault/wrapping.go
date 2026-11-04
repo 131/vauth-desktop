@@ -38,15 +38,20 @@ func (c *Client) requestWithTTL(method, path string, payload any, ttl int) (int,
 	return v.Request(method, path, c.token, payload, 0)
 }
 
-// Wrap accepts text and returns its single-use token. The Vault JSON envelope
-// and five-minute lifetime are implementation details, not public options.
-func (c *Client) Wrap(text string) (string, error) {
+// Wrap accepts text and a supported lifetime, returning a single-use token.
+// The Vault JSON envelope remains private.
+func (c *Client) Wrap(text string, ttlSeconds int) (string, error) {
 	if strings.TrimSpace(text) == "" {
 		return "", i18n.Errorf("err.wrap.text")
 	}
+	switch ttlSeconds {
+	case 900, 21600, 259200: // 15 minutes, 6 hours, 72 hours
+	default:
+		return "", i18n.Errorf("err.wrap.ttl")
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	response, err := c.callWithTTL("POST", "sys/wrapping/wrap", map[string]string{"value": text}, false, 300)
+	response, err := c.callWithTTL("POST", "sys/wrapping/wrap", map[string]string{"value": text}, false, ttlSeconds)
 	if err != nil {
 		return "", err
 	}

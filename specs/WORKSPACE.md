@@ -21,7 +21,9 @@ The signed-in workspace has five tabs, in this order:
 4. **Send (wrap) a one-time-secret**: write a message and create/copy its single-use token.
 5. **Open (unwrap) a one-time-secret**: paste a token and read the original message directly.
 
-Both message tabs use one large primary action, without JSON or TTL options;
+Both message tabs use one large primary action without JSON input. Wrap offers
+a lifetime dropdown (15 min, 6 h, 72 h); token fields are single-line and the
+recovered secret uses a read-only textarea;
 see [WRAPPING.md](WRAPPING.md). Click an environment/KV field name to copy its
 name without revealing or copying its value.
 

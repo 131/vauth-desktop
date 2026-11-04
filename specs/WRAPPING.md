@@ -9,12 +9,15 @@ The interface and RPC contract deal only in text and tokens, not JSON documents.
 
 - **Send (wrap) a one-time-secret**: write any nonblank message and click **Wrap and copy**. The app creates
   a single-use Vault token, displays it and copies it to the clipboard. Send
-  that token to the recipient. Validity is fixed at five minutes maximum; Vault
-  limits remain authoritative. There is no format or duration selector.
+  that token to the recipient. The lifetime dropdown offers **15 min** (default),
+  **6 h** and **72 h**. Vault policies remain authoritative and can refuse a
+  selected lifetime. There is no JSON format selector.
 - **Open (unwrap) a one-time-secret**: paste the received token and click **Unwrap**. Display the original
   message directly as read-only text, with a copy icon. No JSON response,
   metadata or additional reveal action is shown. The token is consumed by this
   action; it cannot be used again.
+- Token input/output are single-line text fields. The secret to send and the
+  recovered secret use textareas, with recovered text read-only.
 - Both forms have one large primary button. Output copy icons allow copying
   again without issuing or consuming another token. A clipboard failure after
   wrapping retains the issued token for manual copying.
@@ -37,8 +40,8 @@ input/output token enters the page and clipboard.
 
 ## Text-only API
 
-- `wrap(text) -> token`: reject blank text, send `POST sys/wrapping/wrap` with
-  the internal JSON object `{"value": text}` and `X-Vault-Wrap-TTL: 300`. Text,
+- `wrap(text, ttlSeconds) -> token`: reject blank text, send `POST sys/wrapping/wrap` with
+  the internal JSON object `{"value": text}` and `X-Vault-Wrap-TTL` set to 900, 21600 or 259200 seconds. Text,
   including whitespace, Unicode and JSON-like content, is preserved exactly.
   Use the session's normal authentication and return only the wrapping token.
 - `unwrap(token) -> text`: trim/reject blank tokens, send one
@@ -46,7 +49,8 @@ input/output token enters the page and clipboard.
   Do not put it in a JSON body, renew the desktop session, retry the one-use
   request or replace the application's session token. Extract only the string
   `data.value`; incompatible payloads fail explicitly after consumption.
-- JSON encoding/decoding, the fixed TTL and Vault metadata are private to Go.
+- JSON encoding/decoding and Vault metadata are private to Go. Go rejects
+  lifetimes outside the three supported dropdown values before any request.
   SDK destination trust, transport, timeout and redirect policy are preserved.
   HTTP errors do not expose server response bodies.
 
@@ -55,7 +59,7 @@ and [unwrap](https://developer.hashicorp.com/vault/api-docs/system/wrapping-unwr
 
 ## Verification
 
-Mock Go tests cover exact text/envelope/headers, fixed TTL, blank/wrong input,
+Mock Go tests cover exact text/envelope/headers, all three TTL choices and invalid TTLs, blank/wrong input,
 malformed or incompatible responses, HTTP/network failures, one use, no retry,
 no session mutation and redirect policy. Browser tests cover the separate tabs,
 string-only RPCs, automatic token copying, direct text output, failed drafts,

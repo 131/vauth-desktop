@@ -33,7 +33,7 @@ its Vault token only in memory; it does not populate the CLI token cache.
   create, edit or delete documents according to your Vault permissions. KV v2
   writes use compare-and-set; KV v1 has no equivalent protection.
 - **Send (wrap) a one-time-secret**: write a message, click **Wrap and copy**, send the copied token.
-  It is valid for up to five minutes and can be used only once.
+  Choose 15 minutes, 6 hours or 72 hours of validity; it can be used only once.
 - **Open (unwrap) a one-time-secret**: paste a received token, click **Unwrap**, read the message.
 
 Click a key's name in the environment or KV document list to copy its name,

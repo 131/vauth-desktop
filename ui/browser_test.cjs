@@ -132,7 +132,7 @@ function page(language, offline = false) {
     await tab.evaluate(()=>[...document.querySelectorAll('#kv-values .key-name')].find(n=>n.textContent==='flag').click());
     await tab.waitForFunction(()=>window.testCopied.length>0);
     assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'flag');
-    // Wrap has no JSON or TTL options, and unwrap is a separate text-only tab.
+    // Wrap has a TTL dropdown but no JSON options; unwrap is a separate text-only tab.
     await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
     assert.equal(await tab.$eval('#unwrap-panel',n=>n.hidden),true);
     assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),"Send (wrap) a one-time-secret");
@@ -143,17 +143,28 @@ function page(language, offline = false) {
     assert.equal(await tab.evaluate(()=>[...document.querySelectorAll('nav .tab')].every(n=>n.getBoundingClientRect().right<=innerWidth)),true,'Full tab labels fit a narrow window');
     await tab.setViewport({width:920,height:600});
 
-    assert.equal(await tab.$('#wrap-mode'),null); assert.equal(await tab.$('#wrap-ttl'),null);
+    assert.equal(await tab.$('#wrap-mode'),null);
+    assert.deepEqual(await tab.$$eval('#wrap-ttl option',nodes=>nodes.map(n=>n.value)),['900','21600','259200']);
+    assert.equal(await tab.$eval('#wrap-ttl',n=>n.value),'900');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.tagName),'INPUT');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.tagName),'INPUT');
+    assert.equal(await tab.$eval('#unwrap-data',n=>n.tagName),'TEXTAREA');
     const messageDraft='adhoc\ntext {"value":false}';
     await tab.type('#wrap-data',messageDraft); await click('#wrap-submit');
     await tab.waitForSelector('#wrap-created:not([hidden])');
     await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
     const wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
-    assert.deepEqual(wrapped.args,[messageDraft],'One string argument; JSON-like text is literal');
+    assert.deepEqual(wrapped.args,[messageDraft,900],'Plain text and selected TTL; JSON-like text is literal');
     assert.equal(await tab.$eval('#wrap-data',n=>n.value),'');
     assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
     assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-wrapping-token','Wrap copies automatically');
     assert.equal(await tab.evaluate(()=>window.testState.trace.some(x=>x.method==='unwrap')),false,'No automatic unwrap');
+    for(const duration of ['21600','259200']) {
+      await tab.select('#wrap-ttl',duration); await tab.type('#wrap-data','TTL test'); await click('#wrap-submit');
+      await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+      assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop().args[1]),Number(duration));
+    }
+
     await tab.evaluate(()=>{document.getElementById('wrap-data').value='failed draft';window.testState.wrapError=true});
     await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
     assert.equal(await tab.$eval('#wrap-data',n=>n.value),'failed draft');

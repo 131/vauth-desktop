@@ -172,7 +172,7 @@
     "err.manifest.missing": "Aucune release publiée sur %s pour l'instant.",
     "tab.wrap": "Send (wrap) a one-time-secret",
     "wrap.title": "Send (wrap) a one-time-secret",
-    "wrap.help": "Écrivez votre message. Wrap crée et copie le token à envoyer. Valable 5 minutes maximum, utilisable une seule fois.",
+    "wrap.help": "Écrivez votre secret, choisissez sa durée de validité, puis Wrap crée et copie le token à envoyer. Une seule ouverture possible.",
     "wrap.data": "Votre secret",
     "wrap.submit": "Wrap et copier",
     "wrap.token": "Token à partager",
@@ -189,7 +189,12 @@
     "err.wrap.text": "Écrivez un message.",
     "err.wrap.message": "Ce token ne contient pas un message texte.",
     "copy.key": "Copier le nom : %s",
-    "copied.key": "Nom de la clé copié."
+    "copied.key": "Nom de la clé copié.",
+    "wrap.ttl": "Durée de validité",
+    "wrap.ttl.15m": "15 min",
+    "wrap.ttl.6h": "6 h",
+    "wrap.ttl.72h": "72 h",
+    "err.wrap.ttl": "Choisissez 15 min, 6 h ou 72 h."
   },
   "en-us": {
     "html.lang": "en",
@@ -364,7 +369,7 @@
     "err.manifest.missing": "No release published on %s yet.",
     "tab.wrap": "Send (wrap) a one-time-secret",
     "wrap.title": "Send (wrap) a one-time-secret",
-    "wrap.help": "Write your message. Wrap creates and copies the token to send. Valid for up to 5 minutes, one use only.",
+    "wrap.help": "Write your secret, choose its lifetime, then Wrap creates and copies the token to send. It can only be opened once.",
     "wrap.data": "Your secret",
     "wrap.submit": "Wrap and copy",
     "wrap.token": "Token to share",
@@ -381,6 +386,11 @@
     "err.wrap.text": "Write a message.",
     "err.wrap.message": "This token does not contain a text message.",
     "copy.key": "Copy name: %s",
-    "copied.key": "Key name copied."
+    "copied.key": "Key name copied.",
+    "wrap.ttl": "Valid for",
+    "wrap.ttl.15m": "15 min",
+    "wrap.ttl.6h": "6 h",
+    "wrap.ttl.72h": "72 h",
+    "err.wrap.ttl": "Choose 15 min, 6 h or 72 h."
   }
 }

@@ -125,7 +125,11 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return a.Client.Wrap(text)
+		ttl, err := arg[int](args, 1)
+		if err != nil {
+			return nil, err
+		}
+		return a.Client.Wrap(text, ttl)
 	case "unwrap":
 		token, err := arg[string](args, 0)
 		if err != nil {
