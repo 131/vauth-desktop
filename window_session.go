@@ -24,21 +24,13 @@ type WindowSession struct {
 	closed atomic.Bool
 }
 
-// edges maps the UI resize zones to the toolkit's resize messages.
-var edges = map[string]string{
-	"top": "n-resize", "top-right": "ne-resize", "right": "e-resize", "bottom-right": "se-resize",
-	"bottom": "s-resize", "bottom-left": "sw-resize", "left": "w-resize", "top-left": "nw-resize",
-}
-
 func NewWindowSession(app *App, wails *application.App, closed func(*WindowSession)) *WindowSession {
 	// UI-only callbacks belong to this session; the copied facade shares the
 	// resident stores/services and never mutates their lifetime.
 	s := &WindowSession{app: *app}
-	s.app.Window = s.WindowAction
 	s.view = wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: tray.WindowTitle, Width: 920, Height: 600, MinWidth: 600, MinHeight: 380,
-		Frameless: true, Hidden: true, InitialPosition: application.WindowCentered,
-		Windows:         application.WindowsWindow{DisableFramelessWindowDecorations: true},
+		Hidden: true, InitialPosition: application.WindowCentered,
 		DevToolsEnabled: os.Getenv("VAUTH_DESKTOP_DEBUG") != "",
 		HTML:            ui.Page(i18n.Current()),
 	})
@@ -70,27 +62,6 @@ func (s *WindowSession) eval(js string) {
 	if !s.closed.Load() {
 		s.view.ExecJS(js)
 	}
-}
-
-func (s *WindowSession) WindowAction(action string) error {
-	if s.closed.Load() {
-		return i18n.Errorf("err.window")
-	}
-	switch action {
-	case "drag":
-		application.InvokeSync(func() { s.view.HandleMessage("wails:drag") })
-	case "minimize":
-		s.view.Hide()
-	case "close":
-		s.view.Close()
-	default:
-		edge, ok := edges[action]
-		if !ok {
-			return i18n.Errorf("err.window")
-		}
-		application.InvokeSync(func() { s.view.HandleMessage("wails:resize:" + edge) })
-	}
-	return nil
 }
 
 func (s *WindowSession) Close() { s.view.Close() }

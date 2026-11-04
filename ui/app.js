@@ -411,10 +411,4 @@ const languageNames = {'fr-fr': 'Français', 'en-us': 'English', 'zh-cn': '简�
 $('language').replaceChildren(...window.I18N.languages.map(name => new Option(languageNames[name] || name, name, false, name === window.I18N.language)));
 $('language').addEventListener('change', () => run($('language'), () => call('set_language', $('language').value)));
 
-// Custom frame actions are session-local RPCs, dispatched by Wails on the UI thread.
-$('minimize-window').addEventListener('click', () => call('window', 'minimize').catch(error => notice(error.message, true)));
-$('close-window').addEventListener('click', () => call('window', 'close').catch(error => notice(error.message, true)));
-document.querySelector('.window-drag').addEventListener('mousedown', event => { if (event.button === 0) { event.preventDefault(); call('window', 'drag').catch(() => {}); } });
-for (const edge of document.querySelectorAll('[data-resize]')) edge.addEventListener('mousedown', event => { if (event.button === 0) { event.preventDefault(); call('window', edge.dataset.resize).catch(() => {}); } });
-
 })();

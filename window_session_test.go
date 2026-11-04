@@ -34,7 +34,5 @@ func TestClosedSessionDropsCallsAndReplies(t *testing.T) {
 	if calls != 0 {
 		t.Fatal("closed session executed a new call")
 	}
-	if err := s.WindowAction("close"); err == nil {
-		t.Fatal("closed window action accepted")
-	}
+
 }

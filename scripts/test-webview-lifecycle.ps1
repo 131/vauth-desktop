@@ -15,6 +15,13 @@ public class LifecycleWin {
  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+ [StructLayout(LayoutKind.Sequential)] public struct Rect { public int Left, Top, Right, Bottom; }
+ [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
+ [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr hwnd, int index);
+ [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
+ public static int ClientWidth(IntPtr hwnd) { Rect r; return GetClientRect(hwnd, out r) ? r.Right-r.Left : 0; }
+ public static int ClientHeight(IntPtr hwnd) { Rect r; return GetClientRect(hwnd, out r) ? r.Bottom-r.Top : 0; }
+
  public static bool VisibleBrowser(IntPtr parent) {
   bool visible = false;
   EnumChildWindows(parent, (hwnd, data) => {
@@ -96,6 +103,14 @@ try {
   Wait-For { (Visible-Gui $process.Id) -ne [IntPtr]::Zero } 'GUI did not open'
   $gui = [LifecycleWin]::Find($process.Id, 'vauth desktop')
   Wait-For { @(Browser-Tree $process.Id).Count -gt 0 } 'No browser processes on Open'
+  if ($cycle -eq 1) {
+   $style = [LifecycleWin]::GetWindowLong($gui, -16)
+   if (($style -band 0x00C00000) -ne 0x00C00000 -or ($style -band 0x00040000) -eq 0) { throw 'Missing native caption or resizable border' }
+   $width = [LifecycleWin]::ClientWidth($gui); $height = [LifecycleWin]::ClientHeight($gui)
+   if (-not [LifecycleWin]::SetWindowPos($gui, [IntPtr]::Zero, 0, 0, ($width + 200), ($height + 200), 6)) { throw 'Native resize failed' }
+   Wait-For { [LifecycleWin]::ClientWidth($gui) -gt $width -and [LifecycleWin]::ClientHeight($gui) -gt $height -and [LifecycleWin]::VisibleBrowser($gui) } 'Client/browser did not follow native resize'
+   'PASS: standard Windows caption and resize grow the client area with browser retained'
+  }
   # Let the page's async bindings and lock screen initialize before closing.
   Start-Sleep -Seconds 2
   $browsers = @(Browser-Tree $process.Id)

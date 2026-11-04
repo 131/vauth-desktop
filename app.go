@@ -43,8 +43,6 @@ type App struct {
 	Updater *update.Updater
 	// Copy uses the resident platform clipboard.
 	Copy func(string) error
-	// Window controls this GUI session only.
-	Window func(string) error
 	// Reload renders the page again, in the current language.
 	Reload   func()
 	Settings *settings.Store
@@ -72,21 +70,15 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 	switch method {
 	case "version":
 		return version, nil
-	case "copy", "window":
+	case "copy":
 		value, err := arg[string](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		if method == "copy" {
-			if a.Copy == nil {
-				return nil, i18n.Errorf("err.copy")
-			}
-			return nil, a.Copy(value)
+		if a.Copy == nil {
+			return nil, i18n.Errorf("err.copy")
 		}
-		if a.Window == nil {
-			return nil, i18n.Errorf("err.window")
-		}
-		return nil, a.Window(value)
+		return nil, a.Copy(value)
 	case "connect":
 		renew, err := arg[bool](args, 0)
 		if err != nil {

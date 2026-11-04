@@ -45,8 +45,8 @@ fields remain read-only. The workspace image uses synthetic demonstration data.
 The app starts in the notification area, without a browser running. Click the
 icon (or launch the app again) to open the workspace. Closing the window destroys
 the WebView2 session and frees its browser processes; the tray and Vault session
-stay available. The next click creates a fresh window. The borderless window uses custom drag/resize and Minimize/Close controls.
-Minimizing only hides the window, retaining its browser. Right-click > Quit exits the app.
+stay available. The next click creates a fresh window. The window uses the standard Windows title bar, controls and resizable
+borders. Minimizing hides the window to the tray, retaining its browser. Right-click > Quit exits the app.
 
 ## Updates
 

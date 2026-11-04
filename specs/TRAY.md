@@ -13,10 +13,11 @@ The optional GUI owns one WebView/browser session, not those services.
 | Minimize or native minimize | Hide window, retain browser | Remain active |
 | Quit | Release window | Exit and close Vault/OIDC state |
 
-The window is borderless: custom header/drag area, eight resize zones and
-Minimize/Close controls, without Windows shadow/rounded corners or an outer
-CSS border. Minimum size remains 600×380; initial size is 920×600. Wails handles
-native drag/resize and hide/show on its UI thread. Closing loses navigation,
+The window uses the standard native Windows frame: title bar, system icon,
+Minimize/Maximize/Close controls and resizable edges/corners. There are no HTML
+window controls or custom resize zones. Minimum size remains 600×380; initial
+size is 920×600. Windows/Wails handle drag, resize, maximize and restore; native
+minimize still hides the session to the tray. Closing loses navigation,
 modal dialogs and unsaved drafts; saved settings and the resident authenticated
 session survive. The new document restores that session through the existing
 backend API, subject to expiry.

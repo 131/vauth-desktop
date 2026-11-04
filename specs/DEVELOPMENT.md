@@ -23,10 +23,10 @@ unvalidated and unreleased.
 
 [TRAY.md](TRAY.md) defines lifetime, input and frame behavior. `main.go` creates
 one `App` and `Runtime`; Wails owns the UI thread, single-instance lock, native
-tray, WebView2/WebKit and frameless window. `Runtime` retains the Vault client
+tray, WebView2/WebKit and standard framed, resizable window. `Runtime` retains the Vault client
 and optional `WindowSession`. Close destroys that window/browser, not the
 Vault session or tray. Quit closes the resident client and its OIDC listener.
-Minimize (custom control or native event) hides the existing session.
+The native Minimize control/event hides the existing session.
 
 The UI is inline HTML/CSS/JS, without generated bindings or a frontend build.
 It waits for `wails:runtime-config-ready`, posts raw `{id,page,method,args}`
@@ -65,8 +65,8 @@ Windows CI ensures WebView2, runs `TestNativeSessionBridge` with
 its own test executable. The probe uses synthetic HTML/version RPCs, never
 Vault or an agent. The lifecycle script isolates APPDATA/LOCALAPPDATA, disables
 update checks and uses an unavailable agent. It verifies tray-only startup,
-three close/reopen cycles with browser process exit, second launch, native
-minimize/hide with the same browser retained, rapid reopening and Quit.
+standard caption/resize styles and client-area resize, three close/reopen
+cycles with browser process exit, second launch, native minimize/hide with the same browser retained, rapid reopening and Quit.
 Never point the script at the installed executable; isolate the single-instance
 ID with a temporary Go overlay for local tests beside a running installation.
 
