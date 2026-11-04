@@ -57,10 +57,10 @@ English labels or mechanically transliterating Vault operations.
 | --- | --- |
 | Send (wrap) a secret | Envoyer un secret |
 | Open (unwrap) a secret | Ouvrir un secret |
-| Wrap your secret into a one-time-token | Créer un jeton à usage unique pour votre secret |
-| Unwrap your one-time-token | Ouvrir votre jeton à usage unique |
-| Your one-time-token | Votre jeton à usage unique |
-| Token to open | Jeton à ouvrir |
+| Wrap your secret into a one-time-token | Créer un token à usage unique pour votre secret |
+| Unwrap your one-time-token | Ouvrir votre token à usage unique |
+| Your one-time-token | Votre token à usage unique |
+| Token to open | Token à ouvrir |
 | Your secret | Votre secret |
 | The secret | Le secret |
 | Valid for | Durée de validité |
@@ -69,8 +69,8 @@ English labels or mechanically transliterating Vault operations.
 Use **secret**, not "message", for the user's text throughout labels, help,
 notifications and errors. In en-us, **one-time-token** is the canonical label;
 "token" is acceptable in surrounding explanations where its purpose is clear.
-In fr-fr, use **jeton à usage unique**, shortened to **jeton** in context. Do not
-mix untranslated "token", "wrap", "unwrap" or English action sentences into
+In fr-fr, keep **token** unchanged and use **token à usage unique** when the
+single-use meaning must be explicit. Translate the surrounding actions and explanations; do not copy English action sentences into
 French controls. Keep the exact technical names in API/code documentation.
 
 The shareable one-time-token is distinct from the application's Vault session

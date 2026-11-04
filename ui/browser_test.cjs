@@ -229,10 +229,10 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#add',node=>node.disabled),true);
     assert.equal(await tab.$eval('#wrap-tab',n=>n.textContent),'Envoyer un secret');
     assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'Ouvrir un secret');
-    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer un jeton à usage unique pour votre secret');
-    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir votre jeton à usage unique');
-    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Votre jeton à usage unique');
-    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Jeton à ouvrir');
+    assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer un token à usage unique pour votre secret');
+    assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir votre token à usage unique');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Votre token à usage unique');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Token à ouvrir');
     await click('#wrap-tab');
     await tab.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}})});
     await tab.type('#wrap-data','Un secret synthétique'); await click('#wrap-submit');

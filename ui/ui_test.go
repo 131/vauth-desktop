@@ -88,6 +88,11 @@ func TestTokenWrapLanguageAndTerminology(t *testing.T) {
 		t.Fatal("terminology section missing")
 	}
 	english, french := i18n.Messages("en-us"), i18n.Messages("fr-fr")
+	for key, value := range french {
+		if strings.Contains(strings.ToLower(value), "jeton") {
+			t.Errorf("%s: fr-fr must retain the term token", key)
+		}
+	}
 	for _, key := range []string{"tab.wrap", "tab.unwrap", "wrap.submit", "wrap.unwrap", "wrap.token", "unwrap.token", "wrap.data", "wrap.result", "wrap.ttl", "wrap.copy.data"} {
 		if english[key] == french[key] {
 			t.Errorf("%s: French still uses English wording", key)
