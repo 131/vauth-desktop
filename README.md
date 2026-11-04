@@ -32,6 +32,9 @@ its Vault token only in memory; it does not populate the CLI token cache.
 - **Secrets browser**: navigate accessible KV stores, reveal/copy values and
   create, edit or delete documents according to your Vault permissions. KV v2
   writes use compare-and-set; KV v1 has no equivalent protection.
+- **Wrap & Unwrap**: share text or a JSON object without creating a KV secret.
+  Choose a validity period, copy the single-use token and unwrap a pasted token
+  explicitly. Recovered data stays masked until revealed.
 
 Secret values stay hidden until revealed. Changes use explicit dialogs; display
 fields remain read-only. The workspace image uses synthetic demonstration data.
@@ -67,7 +70,7 @@ only kept in memory while the app runs.
 [Settings](specs/SETTINGS.md), [releases and auto-update](specs/RELEASES.md),
 [Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md).
 
-[Workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
+[Wrapping](specs/WRAPPING.md), [workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
 Version 2.0.0 introduces the workspace and SSO enrollment flow.
 Live Windows SSO/enrollment validation remains operator-confirmed.
 

@@ -159,3 +159,17 @@ dialog p{margin:4px 0}
 
 button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-1px;animation:busy-spin .8s linear infinite}
 @keyframes busy-spin{to{transform:rotate(360deg)}}
+
+/* Ad-hoc wrapping forms scroll independently of the workspace chrome. */
+#wrap-panel{min-height:0;overflow:auto}
+.wrap-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:8px 0}
+.wrap-layout article{min-width:0}
+.wrap-layout textarea{font:12px ui-monospace,Consolas,monospace;resize:vertical}
+.wrap-layout label{display:block;margin:6px 0}
+#wrap-ttl{max-width:120px}
+#wrap-info{overflow-wrap:anywhere}
+@media(max-width:680px){.wrap-layout{grid-template-columns:minmax(0,1fr)}}
+#wrap-panel>.section-head>div:first-child{display:block}
+#wrap-panel>.section-head .muted{display:block;white-space:normal;margin:3px 0 0}
+#wrap-clear{flex:none}
+.wrap-layout select{display:block;width:100%;margin-top:3px;padding:5px;border:1px solid var(--line);border-radius:4px;background:#fff;color:inherit;font:inherit}

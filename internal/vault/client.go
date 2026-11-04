@@ -134,6 +134,10 @@ func vaultError(err error) error {
 // call sends a Vault request, refreshing the session when due and logging in
 // again once when the token is no longer valid. A nil result means 404 when optional.
 func (c *Client) call(method, path string, payload any, optional bool) (map[string]any, error) {
+	return c.callWithTTL(method, path, payload, optional, 0)
+}
+
+func (c *Client) callWithTTL(method, path string, payload any, optional bool, ttl int) (map[string]any, error) {
 	if c.sso {
 		if !c.expiresAt.IsZero() && !c.now().Before(c.expiresAt) {
 			c.clear()
@@ -155,7 +159,14 @@ func (c *Client) call(method, path string, payload any, optional bool) (map[stri
 		}
 	}
 	for attempt := 0; ; attempt++ {
-		status, body, err := c.vauth.Request(method, path, c.token, payload, 0)
+		var status int
+		var body []byte
+		var err error
+		if ttl > 0 {
+			status, body, err = c.requestWithTTL(method, path, payload, ttl)
+		} else {
+			status, body, err = c.vauth.Request(method, path, c.token, payload, 0)
+		}
 		if err != nil {
 			return nil, err
 		}

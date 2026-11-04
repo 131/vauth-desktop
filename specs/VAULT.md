@@ -65,11 +65,12 @@ SSH-agent login uses the existing shared encrypted vauth-login cache. SSO holds
 the freshly issued Vault token only in Go memory, renews it through Vault if
 renewable and requires explicit login on expiry/revocation. It does not call
 SSH/JWT `Connect` or read/write the CLI cache; see
-[AUTHENTICATION.md](AUTHENTICATION.md). Tokens and callback codes never enter
+[AUTHENTICATION.md](AUTHENTICATION.md). Session tokens and callback codes never enter
 the page, settings, logs or URLs containing a Vault credential.
 
 Vault calls run in Go; [WORKSPACE.md](WORKSPACE.md) defines the list/editor UI.
-This describes the 2.0.0 implementation.
+Response wrapping is defined in [WRAPPING.md](WRAPPING.md). Wrapping tokens are
+explicit user input/output in the page, unlike the Go-only authentication token.
 
 ### Operator profile verification — October 27, 2026
 

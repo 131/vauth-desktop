@@ -120,6 +120,22 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 			}
 			return nil, a.Client.WriteKV(mount, path, values, version, create)
 		}
+	case "wrap":
+		values, err := arg[map[string]any](args, 0)
+		if err != nil {
+			return nil, i18n.Errorf("err.wrap.object")
+		}
+		ttl, err := arg[int](args, 1)
+		if err != nil {
+			return nil, i18n.Errorf("err.wrap.ttl")
+		}
+		return a.Client.Wrap(values, ttl)
+	case "unwrap":
+		token, err := arg[string](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return a.Client.Unwrap(token)
 	case "read":
 		return a.Client.Read()
 	case "write":

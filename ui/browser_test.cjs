@@ -37,6 +37,8 @@ function page(language, offline = false) {
         case 'session_check': return respond(null,state.expires?'Expired':'',state.expires);
         case 'read': return state.readError ? respond(null,'Access denied') : respond({values:{TOKEN:'synthetic-environment',VAUTH_USER_NAME:'must-not-win'},version:1});
         case 'write': return respond(null);
+        case 'wrap': if(state.wrapError) return respond(null,'Wrap denied'); return respond({token:'synthetic-wrapping-token',ttl:args[1],creation_time:'2026-11-04T10:00:00Z'});
+        case 'unwrap': if(state.unwrapError) return respond(null,'Invalid or consumed token'); return respond({data:{value:'synthetic-unwrapped-text',flag:true,array:[null,2]}});
         case 'agent_keys': return respond([]);
         case 'ssh_read': return respond([]);
         case 'ssh_publish': return respond(null);
@@ -118,6 +120,49 @@ function page(language, offline = false) {
     await tab.evaluate(()=>[...document.querySelectorAll('#kv-folders button')].find(x=>x.textContent.includes('slow')).click());
     await click('#kv-breadcrumbs button'); await new Promise(resolve=>setTimeout(resolve,220));
     assert.equal(await tab.$eval('#kv-document-path',node=>node.textContent),''); assert.equal(await tab.$$eval('#kv-values .entry',nodes=>nodes.length),0);
+    // Ad-hoc wrapping never writes KV; typed JSON and text use explicit actions.
+    await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
+    await tab.evaluate(()=>{window.testCopied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.testCopied.push(text)}})});
+    await tab.type('#wrap-data','adhoc\ntext');
+    await click('#wrap-submit'); await tab.waitForSelector('#wrap-created:not([hidden])');
+    let wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
+    assert.deepEqual(wrapped.args,[{value:'adhoc\ntext'},300]);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
+    await click('#wrap-copy'); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-wrapping-token');
+    assert.equal(await tab.evaluate(()=>window.testState.trace.some(x=>x.method==='unwrap')),false,'No automatic unwrap');
+    const jsonDraft=JSON.stringify({flag:false,array:[null,2],nested:{ok:true}});
+    await tab.select('#wrap-mode','json');
+    await tab.$eval('#wrap-data',n=>n.value='[]');
+    const count=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length);
+    await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length),count);
+    await tab.evaluate(draft=>{document.getElementById('wrap-data').value=draft;window.testState.wrapError=true},jsonDraft);
+    await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),jsonDraft,'Keep failed draft');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token','Keep previous issued token');
+    await tab.evaluate(()=>window.testState.wrapError=false); await click('#wrap-submit');
+    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
+    assert.deepEqual(wrapped.args[0],JSON.parse(jsonDraft));
+    await tab.type('#unwrap-token','  synthetic-wrapping-token  '); await click('#unwrap-submit');
+    await tab.waitForSelector('#unwrap-result:not([hidden])');
+    assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'············');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'');
+    await click('#unwrap-copy'); assert.equal(JSON.parse(await tab.evaluate(()=>window.testCopied.pop())).data.value,'synthetic-unwrapped-text');
+    await click('#unwrap-reveal'); assert.equal(JSON.parse(await tab.$eval('#unwrap-data',n=>n.value)).data.value,'synthetic-unwrapped-text');
+    await click('#ssh-tab'); await click('#wrap-tab'); assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'············','Leaving remasks data');
+    await tab.type('#unwrap-token','already-used'); await tab.evaluate(()=>window.testState.unwrapError=true);
+    await click('#unwrap-submit'); await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
+    assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true,'Failed unwrap clears stale data');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'already-used','Failure keeps token');
+    await click('#wrap-clear');
+    for(const id of ['wrap-data','wrap-token','unwrap-token','unwrap-data']) assert.equal(await tab.$eval('#'+id,n=>n.value),'');
+    // A late one-use response cannot repopulate a cleared form.
+    await tab.type('#unwrap-token','late'); await tab.evaluate(()=>window.testState.unwrapError=false);
+    await tab.evaluate(()=>{document.getElementById('unwrap-form').dispatchEvent(new Event('submit',{cancelable:true}));document.getElementById('wrap-clear').click()});
+    await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
+    assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true);
     // SSO can reach first-enrollment UI even with no database permission.
     await tab.goto('http://127.0.0.1:'+server.address().port+'/fr?offline');
     await tab.evaluate(()=>window.testState.readError=true); await click('#sso-login');
@@ -130,7 +175,16 @@ function page(language, offline = false) {
       await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
       await tab.setViewport({width:920,height:600}); await tab.screenshot({path:process.env.UI_SCREENSHOT});
     }
+    if (process.env.UI_WRAP_SCREENSHOT) {
+      await tab.goto('http://127.0.0.1:'+server.address().port+'/en');
+      await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
+      await click('#wrap-tab'); await tab.type('#wrap-data','A temporary password to share'); await click('#wrap-submit');
+      await tab.waitForSelector('#wrap-created:not([hidden])'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
+      await tab.waitForSelector('#unwrap-result:not([hidden])');
+      await tab.evaluate(()=>document.querySelectorAll('#toasts .toast .tool').forEach(button=>button.click()));
+      await tab.setViewport({width:920,height:600}); await tab.screenshot({path:process.env.UI_WRAP_SCREENSHOT});
+    }
     assert.deepEqual(errors,[],'Browser script errors');
-    console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses and first enrollment OK');
+    console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment and ad-hoc wrapping OK');
   } finally {if(browser) await browser.close();await new Promise(resolve=>server.close(resolve))}
 })().catch(error=>{console.error(error);process.exitCode=1});

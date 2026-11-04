@@ -46,3 +46,22 @@ func TestKVArgumentsAndRemovedMethod(t *testing.T) {
 		t.Fatal("signed-out session unexpectedly authenticated")
 	}
 }
+
+func TestWrappingArguments(t *testing.T) {
+	app := &App{Client: &vault.Client{}}
+	for _, args := range [][]json.RawMessage{
+		nil, {json.RawMessage(`[]`), json.RawMessage(`300`)},
+		{json.RawMessage(`null`), json.RawMessage(`300`)},
+		{json.RawMessage(`{}`)}, {json.RawMessage(`{}`), json.RawMessage(`"300"`)},
+		{json.RawMessage(`{}`), json.RawMessage(`0`)},
+	} {
+		if _, err := app.Handle("wrap", args); err == nil {
+			t.Fatal("invalid wrap accepted")
+		}
+	}
+	for _, args := range [][]json.RawMessage{nil, {json.RawMessage(`42`)}, {json.RawMessage(`"  "`)}} {
+		if _, err := app.Handle("unwrap", args); err == nil {
+			t.Fatal("invalid unwrap accepted")
+		}
+	}
+}

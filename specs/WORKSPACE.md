@@ -2,7 +2,7 @@
 
 ## Development status
 
-This describes the 2.0.0 workspace implementation.
+This describes the workspace implementation, including ad-hoc response wrapping.
 The desktop uses the approved labels and layout below. Callback configuration
 is deployed and published in both owning systems; see
 [AUTHENTICATION.md](AUTHENTICATION.md). Mock backend and browser tests validate
@@ -11,13 +11,15 @@ public-key enrollment remain part of the release acceptance checklist.
 
 ## Navigation
 
-The signed-in workspace has three tabs, in this order:
+The signed-in workspace has four tabs, in this order:
 
 1. **Vauth Secured Environnement (venv)**: personal environment variables and
    Vault identity metadata in one list; selected by default.
 2. **SSH Keys**: agent-key selection and publication, including first enrollment
    after SSO.
 3. **Secrets browser**: embedded browser/editor for user-accessible KV mounts.
+4. **Wrap & Unwrap**: ad-hoc text/JSON sharing with an expiring single-use token;
+   see [WRAPPING.md](WRAPPING.md).
 
 Use these exact operator-selected tab labels and order, including
 “Environnement”. Labels remain catalog-backed; supporting help/errors are
@@ -122,7 +124,7 @@ silently switch authentication methods.
   affected folder/document and notify the user. Persist neither secrets nor
   drafts to settings, disk, logs or task handoffs.
 - Vault operations use the active Go session and its authentication-specific
-  renewal behavior. No token reaches the page or remote Vault UI. The new SSO
+  renewal behavior. No session token reaches the page or remote Vault UI. The new SSO
   authorization URL is only for authentication, not a token-bearing Vault UI
   link or a wrapped child token.
 - Go validates the selected mount against current discovered KV mounts and

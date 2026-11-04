@@ -77,6 +77,7 @@ async function copy(text) {
 }
 async function load(renew = false) { await startSession(await call('connect', renew)); }
 async function startSession(next) {
+  clearWrapping();
   authEpoch++; kv.request++; kv.mounts = []; kv.mount = ''; kv.keys = []; kv.doc = null; kv.dirty = true;
   kv.folder = ''; kv.path = ''; for (const id of ['kv-values','kv-folders','kv-mount','kv-breadcrumbs']) $(id).replaceChildren();
   renderKVDocument();
@@ -97,6 +98,7 @@ async function refreshEnvironment(profile = true) {
   } catch (error) { if (epoch !== authEpoch) return; if (error.expired) clearSession(); else { databaseLoaded = false; render(); } notice(error.message, true); }
 }
 function clearSession() {
+  clearWrapping();
   authEpoch++; kv.request++; session = null; identity = {}; database = {values: {}, version: 0}; databaseLoaded = false;
   kv.mounts = []; kv.mount = ''; kv.keys = []; kv.doc = null; kv.path = ''; kvEditor = null;
   for (const id of ['entries', 'agent-keys', 'kv-values', 'kv-folders', 'kv-mount']) $(id).replaceChildren();
@@ -294,14 +296,67 @@ $('kv-editor-reload').addEventListener('click', () => run($('kv-editor-reload'),
   kvEditor.version = doc.version; kvEditor.create = !doc.exists && !doc.version; kvEditor.original = JSON.stringify(doc.values, null, 2);
   $('kv-editor-json').value = kvEditor.original; $('kv-editor-error').hidden = true; $('kv-editor-reload').hidden = true; await editorCapabilities();
 }));
+// Ad-hoc response wrapping: plaintext remains in this disposable page only.
+let wrappingEpoch = 0, unwrapped = '', unwrapVisible = false;
+function hideUnwrapped() {
+  unwrapVisible = false; $('unwrap-data').value = unwrapped ? '············' : '';
+  $('unwrap-reveal').textContent = t('wrap.reveal');
+}
+function clearWrapping() {
+  wrappingEpoch++; unwrapped = ''; unwrapVisible = false;
+  for (const id of ['wrap-data', 'wrap-token', 'unwrap-token', 'unwrap-data']) $(id).value = '';
+  $('wrap-created').hidden = true; $('unwrap-result').hidden = true; $('wrap-info').textContent = '';
+  $('unwrap-reveal').textContent = t('wrap.reveal');
+}
+$('wrap-clear').addEventListener('click', clearWrapping);
+$('wrap-form').addEventListener('submit', event => {
+  event.preventDefault(); run($('wrap-submit'), async () => {
+    const epoch = wrappingEpoch, auth = authEpoch, draft = $('wrap-data').value;
+    const minutes = Number($('wrap-ttl').value);
+    if (!Number.isSafeInteger(minutes) || minutes <= 0 || !Number.isSafeInteger(minutes * 60)) throw new Error(t('err.wrap.ttl'));
+    let data;
+    if ($('wrap-mode').value === 'text') data = {value: draft};
+    else {
+      try { data = JSON.parse(draft); } catch { throw new Error(t('err.wrap.object')); }
+      if (!data || Array.isArray(data) || typeof data !== 'object') throw new Error(t('err.wrap.object'));
+    }
+    // Keep the previous issued token until another wrap actually succeeds.
+    const info = await call('wrap', data, minutes * 60);
+    if (epoch !== wrappingEpoch || auth !== authEpoch) return;
+    $('wrap-token').value = info.token; $('wrap-info').textContent = t('wrap.info', info.ttl, info.creation_time);
+    $('wrap-created').hidden = false;
+    if ($('wrap-data').value === draft) $('wrap-data').value = '';
+    notice(t('wrap.done'));
+  });
+});
+$('wrap-copy').addEventListener('click', () => run($('wrap-copy'), () => copy($('wrap-token').value)));
+$('unwrap-form').addEventListener('submit', event => {
+  event.preventDefault(); run($('unwrap-submit'), async () => {
+    const epoch = wrappingEpoch, auth = authEpoch, token = $('unwrap-token').value.trim();
+    if (!token) throw new Error(t('err.wrap.token'));
+    unwrapped = ''; hideUnwrapped(); $('unwrap-result').hidden = true;
+    const response = await call('unwrap', token);
+    if (epoch !== wrappingEpoch || auth !== authEpoch) return;
+    unwrapped = JSON.stringify(response, null, 2); hideUnwrapped(); $('unwrap-result').hidden = false;
+    if ($('unwrap-token').value.trim() === token) $('unwrap-token').value = '';
+    notice(t('wrap.unwrapped'));
+  });
+});
+$('unwrap-reveal').addEventListener('click', () => {
+  unwrapVisible = !unwrapVisible; $('unwrap-data').value = unwrapVisible ? unwrapped : '············';
+  $('unwrap-reveal').textContent = t(unwrapVisible ? 'wrap.hide' : 'wrap.reveal');
+});
+$('unwrap-copy').addEventListener('click', () => run($('unwrap-copy'), () => copy(unwrapped)));
+
 function selectTab(tab, refresh = true) {
+  if (tab !== 'wrap') hideUnwrapped();
   activeTab = tab;
-  for (const item of ['secrets', 'ssh', 'kv']) { $(item + '-panel').hidden = item !== tab; $(item + '-tab').classList.toggle('active', item === tab); }
+  for (const item of ['secrets', 'ssh', 'kv', 'wrap']) { $(item + '-panel').hidden = item !== tab; $(item + '-tab').classList.toggle('active', item === tab); }
   if (tab === 'ssh') run($('ssh-tab'), loadSSH);
   if (tab === 'kv') run($('kv-tab'), loadKV);
   if (tab === 'secrets' && !databaseLoaded && refresh) run($('secrets-tab'), refreshEnvironment);
 }
-for (const tab of ['secrets', 'ssh', 'kv']) $(tab + '-tab').addEventListener('click', () => selectTab(tab));
+for (const tab of ['secrets', 'ssh', 'kv', 'wrap']) $(tab + '-tab').addEventListener('click', () => selectTab(tab));
 $('ssh-form').addEventListener('submit', event => { event.preventDefault(); run(event.submitter, async () => { if (!await confirmed(t('ssh.publish.confirm'))) return; await call('ssh_publish', $('ssh-key').value); if (session.auth_mode === 'sso') $('continue-ssh').hidden = false; notice(t('ssh.published')); await loadSSH(); }); });
 // Sign-in failures stay inline. SSO never blocks public-key entry on an agent failure.
 async function signIn(sso = false) {
