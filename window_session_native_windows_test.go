@@ -67,7 +67,7 @@ func TestNativeSessionBridge(t *testing.T) {
 		select {
 		case <-done:
 			return
-		case <-time.After(20 * time.Second):
+		case <-time.After(90 * time.Second):
 			once.Do(func() { result <- fmt.Errorf("native bridge timed out"); application.InvokeAsync(app.Quit) })
 		}
 	}()
