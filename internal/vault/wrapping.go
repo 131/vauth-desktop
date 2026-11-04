@@ -38,66 +38,65 @@ func (c *Client) requestWithTTL(method, path string, payload any, ttl int) (int,
 	return v.Request(method, path, c.token, payload, 0)
 }
 
-// WrapInfo is a single-use bearer token, not the desktop's session token.
-type WrapInfo struct {
-	Token        string `json:"token"`
-	TTL          int    `json:"ttl"`
-	CreationTime string `json:"creation_time"`
-	CreationPath string `json:"creation_path"`
-}
-
-// Wrap stores an ad-hoc JSON object in Vault's response wrapping, never KV.
-func (c *Client) Wrap(values map[string]any, ttl int) (*WrapInfo, error) {
-	if values == nil {
-		return nil, i18n.Errorf("err.wrap.object")
-	}
-	if ttl <= 0 {
-		return nil, i18n.Errorf("err.wrap.ttl")
+// Wrap accepts text and returns its single-use token. The Vault JSON envelope
+// and five-minute lifetime are implementation details, not public options.
+func (c *Client) Wrap(text string) (string, error) {
+	if strings.TrimSpace(text) == "" {
+		return "", i18n.Errorf("err.wrap.text")
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	response, err := c.callWithTTL("POST", "sys/wrapping/wrap", values, false, ttl)
+	response, err := c.callWithTTL("POST", "sys/wrapping/wrap", map[string]string{"value": text}, false, 300)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	encoded, err := json.Marshal(response["wrap_info"])
-	if err != nil {
-		return nil, i18n.Errorf("err.response")
+	info, ok := response["wrap_info"].(map[string]any)
+	if !ok {
+		return "", i18n.Errorf("err.response")
 	}
-	var info WrapInfo
-	if json.Unmarshal(encoded, &info) != nil || info.Token == "" || info.TTL <= 0 {
-		return nil, i18n.Errorf("err.response")
+	token, ok := info["token"].(string)
+	ttl, validTTL := info["ttl"].(float64)
+	if !ok || token == "" || !validTTL || ttl <= 0 {
+		return "", i18n.Errorf("err.response")
 	}
-	return &info, nil
+	return token, nil
 }
 
 // Unwrap uses the wrapping token ONLY as the client token. No login token,
 // token body parameter, session renewal or retry may consume it a second time.
-func (c *Client) Unwrap(token string) (map[string]any, error) {
+func (c *Client) Unwrap(token string) (string, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return nil, i18n.Errorf("err.wrap.token")
+		return "", i18n.Errorf("err.wrap.token")
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.vauth == nil {
 		if err := c.connect(false); err != nil {
-			return nil, err
+			return "", err
 		}
 	}
 	status, body, err := c.vauth.Request("POST", "sys/wrapping/unwrap", token, nil, 0)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if status == 400 || status == 403 {
-		return nil, i18n.Errorf("err.wrap.invalid")
+		return "", i18n.Errorf("err.wrap.invalid")
 	}
 	if status < 200 || status >= 300 {
-		return nil, &VaultError{status}
+		return "", &VaultError{status}
 	}
 	var response map[string]any
 	if json.Unmarshal(body, &response) != nil || response == nil {
-		return nil, i18n.Errorf("err.response")
+		return "", i18n.Errorf("err.response")
 	}
-	return response, nil
+	data, ok := response["data"].(map[string]any)
+	if !ok {
+		return "", i18n.Errorf("err.wrap.message")
+	}
+	text, ok := data["value"].(string)
+	if !ok {
+		return "", i18n.Errorf("err.wrap.message")
+	}
+	return text, nil
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -32,7 +31,7 @@ func wrappingClient(t *testing.T, handler http.HandlerFunc) *Client {
 }
 
 func TestWrapAndUnwrap(t *testing.T) {
-	values := map[string]any{"value": "ad-hoc\ntext", "nested": map[string]any{"flag": true, "array": []any{nil, float64(2)}}}
+	text := "ad-hoc\ntext {\"value\":false} 😈"
 	var stored map[string]any
 	calls := 0
 	client := wrappingClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -45,7 +44,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&stored); err != nil {
 				t.Error(err)
 			}
-			if !reflect.DeepEqual(stored, values) {
+			if len(stored) != 1 || stored["value"] != text {
 				t.Error("payload types changed")
 			}
 			json.NewEncoder(w).Encode(map[string]any{"wrap_info": map[string]any{"token": "single-use", "ttl": 300, "creation_time": "2026-11-04T10:00:00Z", "creation_path": "sys/wrapping/wrap"}})
@@ -66,9 +65,9 @@ func TestWrapAndUnwrap(t *testing.T) {
 		}
 	})
 	originalHTTP := client.vauth.HTTPClient
-	info, err := client.Wrap(values, 300)
-	if err != nil || info.Token != "single-use" || info.TTL != 300 {
-		t.Fatalf("wrap: %+v %v", info, err)
+	token, err := client.Wrap(text)
+	if err != nil || token != "single-use" {
+		t.Fatalf("wrap: %+v %v", token, err)
 	}
 	if client.vauth.HTTPClient != originalHTTP {
 		t.Fatal("SDK client mutated")
@@ -77,7 +76,7 @@ func TestWrapAndUnwrap(t *testing.T) {
 	client.sso = true
 	client.expiresAt = time.Now().Add(-time.Hour)
 	result, err := client.Unwrap("  single-use\n")
-	if err != nil || !reflect.DeepEqual(result["data"], values) {
+	if err != nil || result != text {
 		t.Fatalf("unwrap: %+v %v", result, err)
 	}
 	if _, err = client.Unwrap("single-use"); err == nil {
@@ -90,12 +89,9 @@ func TestWrapAndUnwrap(t *testing.T) {
 
 func TestWrappingValidationAndFailures(t *testing.T) {
 	client := &Client{}
-	for _, input := range []struct {
-		values map[string]any
-		ttl    int
-	}{{nil, 300}, {map[string]any{}, 0}, {map[string]any{}, -1}} {
-		if _, err := client.Wrap(input.values, input.ttl); err == nil {
-			t.Fatal("invalid input accepted")
+	for _, text := range []string{"", " \n\t"} {
+		if _, err := client.Wrap(text); err == nil {
+			t.Fatal("blank message accepted")
 		}
 	}
 	if _, err := client.Unwrap(" \n"); err == nil {
@@ -119,7 +115,7 @@ func TestWrappingValidationAndFailures(t *testing.T) {
 			if status == 403 {
 				return
 			}
-			if _, err := client.Wrap(map[string]any{}, 300); err == nil {
+			if _, err := client.Wrap("message"); err == nil {
 				t.Fatal("wrap status ignored")
 			}
 		})
@@ -127,12 +123,12 @@ func TestWrappingValidationAndFailures(t *testing.T) {
 	for _, body := range []string{`not-json`, `{}`, `{"wrap_info":null}`, `{"wrap_info":{"token":"x","ttl":0}}`} {
 		t.Run(body, func(t *testing.T) {
 			client := wrappingClient(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, body) })
-			if _, err := client.Wrap(map[string]any{}, 300); err == nil {
+			if _, err := client.Wrap("message"); err == nil {
 				t.Fatal("invalid response accepted")
 			}
 		})
 	}
-	for _, body := range []string{`not-json`, `null`, `[]`} {
+	for _, body := range []string{`not-json`, `null`, `[]`, `{}`, `{"data":{}}`, `{"data":{"value":42}}`, `{"data":{"value":null}}`} {
 		t.Run("unwrap-"+body, func(t *testing.T) {
 			client := wrappingClient(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, body) })
 			if _, err := client.Unwrap("x"); err == nil {
@@ -173,7 +169,7 @@ func TestWrapDeniedWithValidSession(t *testing.T) {
 		}
 		w.WriteHeader(403)
 	})
-	if _, err := client.Wrap(map[string]any{}, 300); err == nil {
+	if _, err := client.Wrap("message"); err == nil {
 		t.Fatal("denied wrap accepted")
 	}
 	if calls != 2 {
@@ -189,7 +185,7 @@ func TestWrapPreservesRedirectPolicy(t *testing.T) {
 		http.Redirect(w, r, "/forbidden", http.StatusTemporaryRedirect)
 	})
 	client.vauth.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	if _, err := client.Wrap(map[string]any{}, 300); err == nil {
+	if _, err := client.Wrap("message"); err == nil {
 		t.Fatal("redirect accepted")
 	}
 }

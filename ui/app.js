@@ -120,7 +120,7 @@ function render() {
   for (const [key, value] of entries) {
     const isFixed = Object.hasOwn(identity, key);
     const row = document.createElement('article'); row.className = 'entry';
-    const name = document.createElement('strong'); name.textContent = key; name.title = key;
+    const name = keyName(key);
     const field = valueField(String(value), key, {secret: !isFixed, copied: t('copied.secret'),
       remove: isFixed ? null : async () => { if (!await confirmed(t('delete.confirm', key))) return; const values = {...database.values}; delete values[key]; await save(values); notice(t('deleted')); }});
     const actions = document.createElement('div'); actions.className = 'actions';
@@ -128,6 +128,13 @@ function render() {
     else { const edit = document.createElement('button'); edit.className = 'secondary small'; edit.type = 'button'; edit.textContent = t('edit'); edit.addEventListener('click', () => openEditor(key)); actions.append(edit); }
     row.append(name, field, actions); $('entries').append(row);
   }
+}
+// The name itself is a keyboard-accessible copy button; it never reveals values.
+function keyName(key) {
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'key-name';
+  button.textContent = key; button.title = t('copy.key', key); button.setAttribute('aria-label', button.title);
+  button.addEventListener('click', () => run(button, async () => { await copy(key); notice(t('copied.key')); }));
+  return button;
 }
 // Masked fields hold a fixed placeholder: neither the value nor its length is in the page.
 const masked = '············';
@@ -233,7 +240,7 @@ function renderKVDocument(message = '') {
   $('kv-message').textContent = message || (!doc ? t('kv.noselection') : !doc.exists ? t('kv.missing') : '');
   if (!doc?.exists) return;
   for (const [key, value] of Object.entries(doc.values).sort(([a], [b]) => a.localeCompare(b))) {
-    const row = document.createElement('article'); row.className = 'entry'; const name = document.createElement('strong'); name.textContent = key; name.title = key;
+    const row = document.createElement('article'); row.className = 'entry'; const name = keyName(key);
     row.append(name, valueField(typeof value === 'string' ? value : JSON.stringify(value), key, {secret: true})); $('kv-values').append(row);
   }
 }
@@ -296,67 +303,48 @@ $('kv-editor-reload').addEventListener('click', () => run($('kv-editor-reload'),
   kvEditor.version = doc.version; kvEditor.create = !doc.exists && !doc.version; kvEditor.original = JSON.stringify(doc.values, null, 2);
   $('kv-editor-json').value = kvEditor.original; $('kv-editor-error').hidden = true; $('kv-editor-reload').hidden = true; await editorCapabilities();
 }));
-// Ad-hoc response wrapping: plaintext remains in this disposable page only.
-let wrappingEpoch = 0, unwrapped = '', unwrapVisible = false;
-function hideUnwrapped() {
-  unwrapVisible = false; $('unwrap-data').value = unwrapped ? '············' : '';
-  $('unwrap-reveal').textContent = t('wrap.reveal');
-}
+// Text in, token out. Wire JSON stays in Go, not in the UI/API contract.
+let wrappingEpoch = 0;
 function clearWrapping() {
-  wrappingEpoch++; unwrapped = ''; unwrapVisible = false;
+  wrappingEpoch++;
   for (const id of ['wrap-data', 'wrap-token', 'unwrap-token', 'unwrap-data']) $(id).value = '';
-  $('wrap-created').hidden = true; $('unwrap-result').hidden = true; $('wrap-info').textContent = '';
-  $('unwrap-reveal').textContent = t('wrap.reveal');
+  $('wrap-created').hidden = true; $('unwrap-result').hidden = true;
 }
-$('wrap-clear').addEventListener('click', clearWrapping);
 $('wrap-form').addEventListener('submit', event => {
   event.preventDefault(); run($('wrap-submit'), async () => {
     const epoch = wrappingEpoch, auth = authEpoch, draft = $('wrap-data').value;
-    const minutes = Number($('wrap-ttl').value);
-    if (!Number.isSafeInteger(minutes) || minutes <= 0 || !Number.isSafeInteger(minutes * 60)) throw new Error(t('err.wrap.ttl'));
-    let data;
-    if ($('wrap-mode').value === 'text') data = {value: draft};
-    else {
-      try { data = JSON.parse(draft); } catch { throw new Error(t('err.wrap.object')); }
-      if (!data || Array.isArray(data) || typeof data !== 'object') throw new Error(t('err.wrap.object'));
-    }
-    // Keep the previous issued token until another wrap actually succeeds.
-    const info = await call('wrap', data, minutes * 60);
+    if (!draft.trim()) throw new Error(t('err.wrap.text'));
+    const token = await call('wrap', draft);
     if (epoch !== wrappingEpoch || auth !== authEpoch) return;
-    $('wrap-token').value = info.token; $('wrap-info').textContent = t('wrap.info', info.ttl, info.creation_time);
-    $('wrap-created').hidden = false;
+    $('wrap-token').value = token; $('wrap-created').hidden = false;
     if ($('wrap-data').value === draft) $('wrap-data').value = '';
-    notice(t('wrap.done'));
+    // Show the issued token before copying: a clipboard failure must not lose it.
+    await copy(token); notice(t('wrap.done'));
   });
 });
+$('wrap-copy').append(icon('copy'));
 $('wrap-copy').addEventListener('click', () => run($('wrap-copy'), () => copy($('wrap-token').value)));
 $('unwrap-form').addEventListener('submit', event => {
   event.preventDefault(); run($('unwrap-submit'), async () => {
     const epoch = wrappingEpoch, auth = authEpoch, token = $('unwrap-token').value.trim();
     if (!token) throw new Error(t('err.wrap.token'));
-    unwrapped = ''; hideUnwrapped(); $('unwrap-result').hidden = true;
-    const response = await call('unwrap', token);
+    $('unwrap-data').value = ''; $('unwrap-result').hidden = true;
+    const text = await call('unwrap', token);
     if (epoch !== wrappingEpoch || auth !== authEpoch) return;
-    unwrapped = JSON.stringify(response, null, 2); hideUnwrapped(); $('unwrap-result').hidden = false;
+    $('unwrap-data').value = text; $('unwrap-result').hidden = false;
     if ($('unwrap-token').value.trim() === token) $('unwrap-token').value = '';
-    notice(t('wrap.unwrapped'));
   });
 });
-$('unwrap-reveal').addEventListener('click', () => {
-  unwrapVisible = !unwrapVisible; $('unwrap-data').value = unwrapVisible ? unwrapped : '············';
-  $('unwrap-reveal').textContent = t(unwrapVisible ? 'wrap.hide' : 'wrap.reveal');
-});
-$('unwrap-copy').addEventListener('click', () => run($('unwrap-copy'), () => copy(unwrapped)));
-
+$('unwrap-copy').append(icon('copy'));
+$('unwrap-copy').addEventListener('click', () => run($('unwrap-copy'), () => copy($('unwrap-data').value)));
 function selectTab(tab, refresh = true) {
-  if (tab !== 'wrap') hideUnwrapped();
   activeTab = tab;
-  for (const item of ['secrets', 'ssh', 'kv', 'wrap']) { $(item + '-panel').hidden = item !== tab; $(item + '-tab').classList.toggle('active', item === tab); }
+  for (const item of ['secrets', 'ssh', 'kv', 'wrap', 'unwrap']) { $(item + '-panel').hidden = item !== tab; $(item + '-tab').classList.toggle('active', item === tab); }
   if (tab === 'ssh') run($('ssh-tab'), loadSSH);
   if (tab === 'kv') run($('kv-tab'), loadKV);
   if (tab === 'secrets' && !databaseLoaded && refresh) run($('secrets-tab'), refreshEnvironment);
 }
-for (const tab of ['secrets', 'ssh', 'kv', 'wrap']) $(tab + '-tab').addEventListener('click', () => selectTab(tab));
+for (const tab of ['secrets', 'ssh', 'kv', 'wrap', 'unwrap']) $(tab + '-tab').addEventListener('click', () => selectTab(tab));
 $('ssh-form').addEventListener('submit', event => { event.preventDefault(); run(event.submitter, async () => { if (!await confirmed(t('ssh.publish.confirm'))) return; await call('ssh_publish', $('ssh-key').value); if (session.auth_mode === 'sso') $('continue-ssh').hidden = false; notice(t('ssh.published')); await loadSSH(); }); });
 // Sign-in failures stay inline. SSO never blocks public-key entry on an agent failure.
 async function signIn(sso = false) {

@@ -50,10 +50,8 @@ func TestKVArgumentsAndRemovedMethod(t *testing.T) {
 func TestWrappingArguments(t *testing.T) {
 	app := &App{Client: &vault.Client{}}
 	for _, args := range [][]json.RawMessage{
-		nil, {json.RawMessage(`[]`), json.RawMessage(`300`)},
-		{json.RawMessage(`null`), json.RawMessage(`300`)},
-		{json.RawMessage(`{}`)}, {json.RawMessage(`{}`), json.RawMessage(`"300"`)},
-		{json.RawMessage(`{}`), json.RawMessage(`0`)},
+		nil, {json.RawMessage(`[]`)}, {json.RawMessage(`null`)},
+		{json.RawMessage(`{}`)}, {json.RawMessage(`42`)}, {json.RawMessage(`"  "`)},
 	} {
 		if _, err := app.Handle("wrap", args); err == nil {
 			t.Fatal("invalid wrap accepted")

@@ -37,8 +37,8 @@ function page(language, offline = false) {
         case 'session_check': return respond(null,state.expires?'Expired':'',state.expires);
         case 'read': return state.readError ? respond(null,'Access denied') : respond({values:{TOKEN:'synthetic-environment',VAUTH_USER_NAME:'must-not-win'},version:1});
         case 'write': return respond(null);
-        case 'wrap': if(state.wrapError) return respond(null,'Wrap denied'); return respond({token:'synthetic-wrapping-token',ttl:args[1],creation_time:'2026-11-04T10:00:00Z'});
-        case 'unwrap': if(state.unwrapError) return respond(null,'Invalid or consumed token'); return respond({data:{value:'synthetic-unwrapped-text',flag:true,array:[null,2]}});
+        case 'wrap': if(state.wrapError) return respond(null,'Wrap denied'); return respond('synthetic-wrapping-token');
+        case 'unwrap': if(state.unwrapError) return respond(null,'Invalid or consumed token'); if(state.unwrapSlow) return setTimeout(()=>respond('late message'),160); return respond('synthetic-unwrapped-text');
         case 'agent_keys': return respond([]);
         case 'ssh_read': return respond([]);
         case 'ssh_publish': return respond(null);
@@ -120,49 +120,59 @@ function page(language, offline = false) {
     await tab.evaluate(()=>[...document.querySelectorAll('#kv-folders button')].find(x=>x.textContent.includes('slow')).click());
     await click('#kv-breadcrumbs button'); await new Promise(resolve=>setTimeout(resolve,220));
     assert.equal(await tab.$eval('#kv-document-path',node=>node.textContent),''); assert.equal(await tab.$$eval('#kv-values .entry',nodes=>nodes.length),0);
-    // Ad-hoc wrapping never writes KV; typed JSON and text use explicit actions.
-    await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
+    // Clicking a key copies only its name, never its masked value.
     await tab.evaluate(()=>{window.testCopied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.testCopied.push(text)}})});
-    await tab.type('#wrap-data','adhoc\ntext');
-    await click('#wrap-submit'); await tab.waitForSelector('#wrap-created:not([hidden])');
-    let wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
-    assert.deepEqual(wrapped.args,[{value:'adhoc\ntext'},300]);
+    await click('#secrets-tab');
+    await tab.evaluate(()=>[...document.querySelectorAll('#entries .key-name')].find(n=>n.textContent==='TOKEN').click());
+    await tab.waitForFunction(()=>window.testCopied.length>0);
+    assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'TOKEN');
+    await click('#kv-tab');
+    await tab.evaluate(()=>[...document.querySelectorAll('#kv-folders button')].find(n=>n.textContent.includes('typed')).click());
+    await tab.waitForSelector('#kv-values .key-name');
+    await tab.evaluate(()=>[...document.querySelectorAll('#kv-values .key-name')].find(n=>n.textContent==='flag').click());
+    await tab.waitForFunction(()=>window.testCopied.length>0);
+    assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'flag');
+    // Wrap has no JSON or TTL options, and unwrap is a separate text-only tab.
+    await click('#wrap-tab'); await tab.waitForSelector('#wrap-panel:not([hidden])');
+    assert.equal(await tab.$eval('#unwrap-panel',n=>n.hidden),true);
+    assert.equal(await tab.$('#wrap-mode'),null); assert.equal(await tab.$('#wrap-ttl'),null);
+    const messageDraft='adhoc\ntext {"value":false}';
+    await tab.type('#wrap-data',messageDraft); await click('#wrap-submit');
+    await tab.waitForSelector('#wrap-created:not([hidden])');
+    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
+    const wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
+    assert.deepEqual(wrapped.args,[messageDraft],'One string argument; JSON-like text is literal');
     assert.equal(await tab.$eval('#wrap-data',n=>n.value),'');
     assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
-    await click('#wrap-copy'); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-wrapping-token');
+    assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-wrapping-token','Wrap copies automatically');
     assert.equal(await tab.evaluate(()=>window.testState.trace.some(x=>x.method==='unwrap')),false,'No automatic unwrap');
-    const jsonDraft=JSON.stringify({flag:false,array:[null,2],nested:{ok:true}});
-    await tab.select('#wrap-mode','json');
-    await tab.$eval('#wrap-data',n=>n.value='[]');
-    const count=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length);
+    await tab.evaluate(()=>{document.getElementById('wrap-data').value='failed draft';window.testState.wrapError=true});
     await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
-    assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length),count);
-    await tab.evaluate(draft=>{document.getElementById('wrap-data').value=draft;window.testState.wrapError=true},jsonDraft);
+    assert.equal(await tab.$eval('#wrap-data',n=>n.value),'failed draft');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token','Keep issued token on failure');
+    // Copy failure must retain the generated token, without an automatic re-wrap.
+    const beforeCopyFailure=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length);
+    await tab.evaluate(()=>{window.testState.wrapError=false;navigator.clipboard.writeText=async()=>{throw new Error('clipboard unavailable')};window.savedExecCommand=document.execCommand;document.execCommand=()=>false;document.getElementById('wrap-data').value='clipboard failure'});
     await click('#wrap-submit'); await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
-    assert.equal(await tab.$eval('#wrap-data',n=>n.value),jsonDraft,'Keep failed draft');
-    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token','Keep previous issued token');
-    await tab.evaluate(()=>window.testState.wrapError=false); await click('#wrap-submit');
-    await tab.waitForFunction(()=>!document.getElementById('wrap-submit').disabled);
-    wrapped=await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').pop());
-    assert.deepEqual(wrapped.args[0],JSON.parse(jsonDraft));
+    assert.equal(await tab.$eval('#wrap-token',n=>n.value),'synthetic-wrapping-token');
+    assert.equal(await tab.evaluate(()=>window.testState.trace.filter(x=>x.method==='wrap').length),beforeCopyFailure+1);
+    await tab.evaluate(()=>{navigator.clipboard.writeText=async text=>window.testCopied.push(text);document.execCommand=window.savedExecCommand});
+    await click('#unwrap-tab'); await tab.waitForSelector('#unwrap-panel:not([hidden])');
+    assert.equal(await tab.$eval('#wrap-panel',n=>n.hidden),true);
     await tab.type('#unwrap-token','  synthetic-wrapping-token  '); await click('#unwrap-submit');
     await tab.waitForSelector('#unwrap-result:not([hidden])');
-    assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'············');
+    assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'synthetic-unwrapped-text','Plain message, no JSON or reveal step');
     assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'');
-    await click('#unwrap-copy'); assert.equal(JSON.parse(await tab.evaluate(()=>window.testCopied.pop())).data.value,'synthetic-unwrapped-text');
-    await click('#unwrap-reveal'); assert.equal(JSON.parse(await tab.$eval('#unwrap-data',n=>n.value)).data.value,'synthetic-unwrapped-text');
-    await click('#ssh-tab'); await click('#wrap-tab'); assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'············','Leaving remasks data');
+    await click('#unwrap-copy'); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-unwrapped-text');
     await tab.type('#unwrap-token','already-used'); await tab.evaluate(()=>window.testState.unwrapError=true);
     await click('#unwrap-submit'); await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
-    assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true,'Failed unwrap clears stale data');
-    assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'already-used','Failure keeps token');
-    await click('#wrap-clear');
-    for(const id of ['wrap-data','wrap-token','unwrap-token','unwrap-data']) assert.equal(await tab.$eval('#'+id,n=>n.value),'');
-    // A late one-use response cannot repopulate a cleared form.
-    await tab.type('#unwrap-token','late'); await tab.evaluate(()=>window.testState.unwrapError=false);
-    await tab.evaluate(()=>{document.getElementById('unwrap-form').dispatchEvent(new Event('submit',{cancelable:true}));document.getElementById('wrap-clear').click()});
-    await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
     assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true);
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.value),'already-used');
+    // Reconnect clears both forms; late responses from the prior session are ignored.
+    await tab.evaluate(()=>{window.testState.unwrapError=false;window.testState.unwrapSlow=true;document.getElementById('unwrap-token').value='late';document.getElementById('unwrap-form').dispatchEvent(new Event('submit',{cancelable:true}))});
+    await click('#reconnect'); await tab.waitForSelector('#secrets-panel:not([hidden])');
+    await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
+    for(const id of ['wrap-data','wrap-token','unwrap-token','unwrap-data']) assert.equal(await tab.$eval('#'+id,n=>n.value),'');
     // SSO can reach first-enrollment UI even with no database permission.
     await tab.goto('http://127.0.0.1:'+server.address().port+'/fr?offline');
     await tab.evaluate(()=>window.testState.readError=true); await click('#sso-login');
@@ -179,12 +189,13 @@ function page(language, offline = false) {
       await tab.goto('http://127.0.0.1:'+server.address().port+'/en');
       await tab.waitForFunction(()=>document.querySelectorAll('#entries .entry').length===5);
       await click('#wrap-tab'); await tab.type('#wrap-data','A temporary password to share'); await click('#wrap-submit');
-      await tab.waitForSelector('#wrap-created:not([hidden])'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
+      await tab.waitForSelector('#wrap-created:not([hidden])'); await click('#unwrap-tab'); await tab.type('#unwrap-token','synthetic-wrapping-token'); await click('#unwrap-submit');
       await tab.waitForSelector('#unwrap-result:not([hidden])');
       await tab.evaluate(()=>document.querySelectorAll('#toasts .toast .tool').forEach(button=>button.click()));
-      await tab.setViewport({width:920,height:600}); await tab.screenshot({path:process.env.UI_WRAP_SCREENSHOT});
+      await tab.setViewport({width:920,height:600}); await click('#wrap-tab'); await tab.screenshot({path:process.env.UI_WRAP_SCREENSHOT});
+      await click('#unwrap-tab'); if(process.env.UI_UNWRAP_SCREENSHOT) await tab.screenshot({path:process.env.UI_UNWRAP_SCREENSHOT});
     }
     assert.deepEqual(errors,[],'Browser script errors');
-    console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment and ad-hoc wrapping OK');
+    console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');
   } finally {if(browser) await browser.close();await new Promise(resolve=>server.close(resolve))}
 })().catch(error=>{console.error(error);process.exitCode=1});

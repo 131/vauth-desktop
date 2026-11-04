@@ -11,15 +11,19 @@ public-key enrollment remain part of the release acceptance checklist.
 
 ## Navigation
 
-The signed-in workspace has four tabs, in this order:
+The signed-in workspace has five tabs, in this order:
 
 1. **Vauth Secured Environnement (venv)**: personal environment variables and
    Vault identity metadata in one list; selected by default.
 2. **SSH Keys**: agent-key selection and publication, including first enrollment
    after SSO.
 3. **Secrets browser**: embedded browser/editor for user-accessible KV mounts.
-4. **Wrap & Unwrap**: ad-hoc text/JSON sharing with an expiring single-use token;
-   see [WRAPPING.md](WRAPPING.md).
+4. **Wrap**: write a message and create/copy its single-use token.
+5. **Unwrap**: paste a token and read the original message directly.
+
+Both message tabs use one large primary action, without JSON or TTL options;
+see [WRAPPING.md](WRAPPING.md). Click an environment/KV field name to copy its
+name without revealing or copying its value.
 
 Use these exact operator-selected tab labels and order, including
 “Environnement”. Labels remain catalog-backed; supporting help/errors are

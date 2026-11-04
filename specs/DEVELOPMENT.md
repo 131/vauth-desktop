@@ -63,8 +63,8 @@ node ui/browser_test.cjs
 The test serves the embedded UI on loopback with synthetic RPC responses. It
 covers merged profile search, masked values, JSON/CAS edits, retained drafts,
 exact-path ACLs, stale document responses and first enrollment without database
-access, ad-hoc text/JSON wrapping, explicit single-use unwrap, masked results,
-retained drafts and cleared/stale wrapping responses. The older development Chromium uses a notification-popover shim and
+access, text-only wrapping, automatic token copy, separate single-use unwrap, plain
+message output, copied key names, retained drafts and reconnect clearing. The older development Chromium uses a notification-popover shim and
 programmatic clicks; this does not replace a native Windows/WebView2 test.
 `UI_SCREENSHOT` optionally captures a synthetic workspace preview.
 
