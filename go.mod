@@ -1,6 +1,6 @@
 module github.com/131/vauth-desktop/v2
 
-// version: 2.1.0
+// version: 2.2.0
 
 go 1.22
 
