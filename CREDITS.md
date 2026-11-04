@@ -5,7 +5,7 @@
 - [vauth-login](https://github.com/131/vauth-login) and
   [ssh-agent-crypt](https://github.com/131/ssh-agent-crypt): Vault login and
   token cache
-- [131/go-webview2](https://github.com/131/go-webview2): disposable WebView2 windows without cgo (fork of jchv/go-webview2)
+- [Wails v3](https://github.com/wailsapp/wails) (MIT): window, tray, single instance and updater
 - Icon: original padlock, drawn by `winres/icon.py`
 - Code signing, courtesy of Essilor International
 

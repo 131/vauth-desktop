@@ -78,3 +78,19 @@ func TestSetChineseLanguage(t *testing.T) {
 		t.Fatalf("%+v %v %d", saved, err, reloads)
 	}
 }
+
+func TestWindowAndClipboardRPC(t *testing.T) {
+	for _, method := range []string{"window", "copy"} {
+		got := ""
+		a := &App{Window: func(value string) error { got = value; return nil }, Copy: func(value string) error { got = value; return nil }}
+		if _, err := a.Handle(method, nil); err == nil {
+			t.Fatalf("%s accepted missing argument", method)
+		}
+		if _, err := a.Handle(method, []json.RawMessage{json.RawMessage(`"synthetic"`)}); err != nil || got != "synthetic" {
+			t.Fatalf("%s: %q %v", method, got, err)
+		}
+		if _, err := (&App{}).Handle(method, []json.RawMessage{json.RawMessage(`"synthetic"`)}); err == nil {
+			t.Fatalf("%s accepted absent platform callback", method)
+		}
+	}
+}

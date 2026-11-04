@@ -1,117 +1,87 @@
 package main
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"golang.org/x/sys/windows"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
-	"unsafe"
-
-	"github.com/131/vauth-desktop/v2/internal/desktop"
-	vauthlogin "github.com/131/vauth-login"
-	"golang.org/x/sys/windows"
 )
 
-// Opt-in: requires a real WebView2 runtime and briefly creates a test GUI.
+// Uses a dedicated Wails app and synthetic HTML: no Vault, agent or installed app.
 func TestNativeSessionBridge(t *testing.T) {
-	if os.Getenv("VAUTH_DESKTOP_NATIVE_TESTS") != "1" {
-		t.Skip("native GUI test not enabled")
+	if os.Getenv("VAUTH_DESKTOP_NATIVE_TESTS") == "" {
+		t.Skip("native bridge opt-in")
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	ole32 := windows.NewLazySystemDLL("ole32.dll")
-	result, _, _ := ole32.NewProc("CoInitializeEx").Call(0, 2)
-	if int32(result) < 0 {
-		t.Fatalf("COM initialization: %#x", uint32(result))
+	ole := windows.NewLazySystemDLL("ole32.dll")
+	initialized, _, _ := ole.NewProc("CoInitializeEx").Call(0, 2)
+	if initialized != 0 && initialized != 1 {
+		t.Fatalf("COM initialization: %#x", initialized)
 	}
-	defer ole32.NewProc("CoUninitialize").Call()
-	data := t.TempDir()
-	t.Setenv("APPDATA", data)
-	t.Setenv("LOCALAPPDATA", t.TempDir())
-	t.Setenv("SSH_AUTH_SOCK", `\\.\pipe\vauth-desktop-native-test-no-agent`)
-	path := filepath.Join(data, "vauth-desktop")
-	if err := os.MkdirAll(path, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(path, "settings.yml"), []byte("update:\n  enable: false\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	host, err := desktop.New("vauth-desktop-native-session-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if !host.Closed() {
-			host.Quit()
-			host.Run()
+	defer ole.NewProc("CoUninitialize").Call()
+	result := make(chan error, 1)
+	var once sync.Once
+	var app *application.App
+	var session *WindowSession
+	app = application.New(application.Options{Name: "vauth-native-bridge-test", RawMessageHandler: func(window application.Window, message string, _ *application.OriginInfo) {
+		if strings.HasPrefix(message, "probe:") {
+			once.Do(func() {
+				var reply struct {
+					ID      int
+					Page    string
+					Result  string
+					Error   string
+					Expired bool
+				}
+				err := json.Unmarshal([]byte(strings.TrimPrefix(message, "probe:")), &reply)
+				if err == nil && (reply.ID != 73 || reply.Page != "native-page" || reply.Result != version || reply.Error != "" || reply.Expired) {
+					err = fmt.Errorf("bad bridge response: %+v", reply)
+				}
+				result <- err
+				application.InvokeAsync(app.Quit)
+			})
+			return
+		}
+		if session != nil && session.view.ID() == window.ID() {
+			session.Message(message)
+		}
+	}})
+	session = NewWindowSession(&App{}, app, func(*WindowSession) {})
+	session.view.SetHTML(`<html><body>synthetic bridge<script>
+ window.vauthDone=reply=>window._wails.invoke('probe:'+JSON.stringify(reply));
+ window.addEventListener('wails:runtime-config-ready',()=>{
+  window._wails.invoke('wails:runtime:ready');
+  window._wails.invoke(JSON.stringify({id:73,page:'native-page',method:'version',args:[]}));
+ });
+ </script></body></html>`)
+	session.Show()
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-done:
+			return
+		case <-time.After(20 * time.Second):
+			once.Do(func() { result <- fmt.Errorf("native bridge timed out"); application.InvokeAsync(app.Quit) })
 		}
 	}()
-	var session *WindowSession
-	app := NewApp(func(string) error { return nil })
-	app.Client.New = func() (*vauthlogin.Vauth, error) { return nil, errors.New("synthetic test: no Vault connection") }
-	defer app.Client.Close()
-	session, err = NewWindowSession(app, host, func() {
-		if session != nil {
-			session.Close()
-		}
-	}, func() {
-		if session != nil {
-			session.Drain()
-		}
-	})
+	err := app.Run()
+	close(done)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer session.Close()
-	if err := session.Show(); err != nil {
-		t.Fatal(err)
-	}
-	var visible bool
-	user32 := windows.NewLazySystemDLL("user32.dll")
-	callback := windows.NewCallback(func(hwnd, data uintptr) uintptr {
-		var name [256]uint16
-		user32.NewProc("GetClassNameW").Call(hwnd, uintptr(unsafe.Pointer(&name[0])), 256)
-		if strings.HasPrefix(windows.UTF16ToString(name[:]), "Chrome_WidgetWin_") {
-			shown, _, _ := user32.NewProc("IsWindowVisible").Call(hwnd)
-			if shown != 0 {
-				visible = true
-			}
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
 		}
-		return 1
-	})
-	user32.NewProc("EnumChildWindows").Call(uintptr(session.view.Window()), callback, 0)
-
-	host.ProcessThread = session.Drain
-	replies := map[string]string{}
-	if err := session.view.Bind("test_probe", func(kind, value string) {
-		replies[kind] = value
-		if len(replies) >= 2 {
-			host.Dispatch(host.Quit)
-		}
-	}); err != nil {
-		t.Fatal(err)
-	}
-	session.view.Init(`window.addEventListener('DOMContentLoaded', () => {
-  const id = 100000000, done = window.vauthDone;
-  window.vauthDone = payload => {
-   if (payload.id === id) test_probe('backend', payload.error || payload.result);
-   else done(payload);
-  };
-  vauth_call(id, 'native-test', 'version', []).then(() => test_probe('binding', 'ok'));
- });`)
-	session.Reload()
-	timeout := time.AfterFunc(30*time.Second, func() { host.Dispatch(host.Quit) })
-	defer timeout.Stop()
-	host.Run()
-	visible = false
-	user32.NewProc("EnumChildWindows").Call(uintptr(session.view.Window()), callback, 0)
-	if !visible {
-		t.Fatal("browser remains hidden after event loop and bridge completions")
-	}
-	if replies["backend"] != version || replies["binding"] != "ok" {
-		t.Fatalf("native bridge replies = %v; need backend version and binding completion", replies)
+	default:
+		t.Fatal("app quit before bridge reply")
 	}
 }

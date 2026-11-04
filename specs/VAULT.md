@@ -92,8 +92,10 @@ no secret paths were enumerated, and no Vault data or ACLs were modified.
 ## Security
 
 - Whoever controls the SSH agent can sign in as the user.
-- Secrets are only fetched from Vault and kept in memory while the window
-  runs; copying one puts it on the clipboard, like any copy.
+- Secrets are fetched on request, not persisted by the UI. Closing the GUI
+  drops its displayed/draft values, while the resident Vault session/profile
+  remain in memory until Quit or expiry. Copy uses the platform clipboard; on
+  Windows, history and cloud clipboard inclusion are disabled.
 - The page runs no remote content (strict CSP); Vault calls are made from Go,
   never from the WebView.
 - The selected `.vauthrc` decides which Vault the application talks to.

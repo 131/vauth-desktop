@@ -36,7 +36,8 @@ The interface and RPC contract deal only in text and tokens, not JSON documents.
 - Reconnect, session clearing and window destruction discard both forms and
   outputs. Replies from a previous session cannot repopulate the new session.
   Tokens/secrets are not written to settings, logs or WebView storage.
-  Clipboard contents are not cleared when the window closes.
+  Clipboard contents are not cleared when the window closes. Copy now uses the
+  resident native clipboard RPC; Windows history/cloud inclusion is disabled.
 
 Anyone holding the token can read the message once before expiry. This uses
 Vault response wrapping, not local encryption or a permanent secret store.

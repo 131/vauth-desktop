@@ -45,15 +45,18 @@ fields remain read-only. The workspace image uses synthetic demonstration data.
 The app starts in the notification area, without a browser running. Click the
 icon (or launch the app again) to open the workspace. Closing the window destroys
 the WebView2 session and frees its browser processes; the tray and Vault session
-stay available. The next click creates a fresh window. Minimizing only hides the
-window. Right-click > Quit exits the app.
+stay available. The next click creates a fresh window. The borderless window uses custom drag/resize and Minimize/Close controls.
+Minimizing only hides the window, retaining its browser. Right-click > Quit exits the app.
 
 ## Updates
 
 vauth-desktop updates itself: when a new version is out, a notification offers
 to install it. Only versions signed by the same publisher are accepted.
 Choose the release channel (`production` by default) and check for updates
-from the settings (wrench, top right).
+from the settings (wrench, top right). The install transaction checks the
+requested release, verifies it and restarts through the Wails helper. Old
+Windows executables left by replacement are cleaned at startup with bounded
+retries; see [release/cleanup details](specs/RELEASES.md).
 
 ## Settings
 
@@ -63,6 +66,9 @@ Language and release channel are set from the app. Everything else lives in
 Your Vault address and sign-in method come from your usual `.vauthrc`, as for
 vauth: see [vauth-login](https://github.com/131/vauth-login#configuration).
 
+Only Windows amd64 is released. The entrypoint and Wails runtime are shared across platforms, but Linux/macOS
+behavior, packaging and update verification remain future work.
+
 ## Security
 
 Whoever uses your SSH agent can sign in as you: lock your session. Secrets are
@@ -71,7 +77,7 @@ only kept in memory while the app runs.
 ## Specifications
 
 [Settings](specs/SETTINGS.md), [releases and auto-update](specs/RELEASES.md),
-[Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md).
+[Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md), [tray/window](specs/TRAY.md).
 
 [Wrapping](specs/TOKEN_WRAP.md), [workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
 Version 2.0.0 introduces the workspace and SSO enrollment flow.
@@ -84,7 +90,7 @@ Live Windows SSO/enrollment validation remains operator-confirmed.
 - [vauth-login](https://github.com/131/vauth-login) and
   [ssh-agent-crypt](https://github.com/131/ssh-agent-crypt): Vault login and
   token cache
-- [131/go-webview2](https://github.com/131/go-webview2): disposable WebView2 windows without cgo (fork of jchv/go-webview2)
+- [Wails v3](https://github.com/wailsapp/wails) (MIT): native runtime, tray, disposable windows and updater
 - Code signing, courtesy of Essilor International
 
 vauth-desktop is not affiliated with HashiCorp: see [CREDITS.md](CREDITS.md)

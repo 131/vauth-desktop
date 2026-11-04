@@ -183,3 +183,18 @@ button.busy:before{content:"";display:inline-block;width:10px;height:10px;margin
 /* Reserve the read-only token area before generation, without layout shifts. */
 #wrap-token{background:#eef2ee}
 #wrap-token:disabled{color:#829086;opacity:1}
+
+/* Borderless window: custom header and native resize hit zones. */
+.window-drag{flex:1;align-self:stretch;min-width:12px}
+.window-tools{display:flex;align-self:stretch;margin-left:4px}
+.window-tools button{width:36px;height:100%;padding:0;background:transparent;color:inherit;border:0;border-radius:0;font-size:18px}
+.window-tools button:hover{background:#e7eee4}
+.window-tools #close-window:hover{background:#c42b1c;color:#fff}
+.resize-edge{position:fixed;z-index:1000;background:transparent}
+.resize-edge.top,.resize-edge.bottom{left:7px;right:7px;height:4px;cursor:ns-resize}
+.resize-edge.top{top:0}.resize-edge.bottom{bottom:0}
+.resize-edge.left,.resize-edge.right{top:7px;bottom:7px;width:4px;cursor:ew-resize}
+.resize-edge.left{left:0}.resize-edge.right{right:0}
+.resize-edge.top-left,.resize-edge.top-right,.resize-edge.bottom-left,.resize-edge.bottom-right{width:7px;height:7px}
+.resize-edge.top-left{top:0;left:0;cursor:nwse-resize}.resize-edge.bottom-right{bottom:0;right:0;cursor:nwse-resize}
+.resize-edge.top-right{top:0;right:0;cursor:nesw-resize}.resize-edge.bottom-left{bottom:0;left:0;cursor:nesw-resize}

@@ -24,11 +24,14 @@ function page(language, offline = false) {
   window.testState = {session:null, readError:false, conflict:false, version:1, trace:[], documents:{}, expires:false,sshError:${offline}};
   const user = {login:'jdoe',vault_addr:'https://vault.example.test',profile:{VAUTH_USER_LOGIN:'jdoe',VAUTH_USER_NAME:'John Doe',VAUTH_USER_MAIL:'jdoe@example.test',CUSTOM_ID:'profile'},fixed_vars:['VAUTH_USER_LOGIN','VAUTH_USER_NAME','VAUTH_USER_MAIL'],auth_mode:'ssh'};
   const typed = {text:'synthetic-hidden-value',flag:true,number:2,array:[1,null],nested:{ok:false}};
-  window.vauth_call = (id, page, method, args) => {
+  window._wails = {invoke: message => {
+    if (message.startsWith('wails:')) return;
+    const {id, page, method, args} = JSON.parse(message);
     const state = window.testState; state.trace.push({method,args});
     const respond = (result, error='', expired=false) => window.vauthDone({id,page,result,error,expired});
     setTimeout(() => {
       switch(method) {
+        case 'copy': return navigator.clipboard.writeText(args[0]).then(() => respond(null), error => respond(null, error.message));
         case 'version': return respond('dev');
         case 'session': return respond(state.session);
         case 'connect': if(state.sshError) return respond(null,'SSH agent unavailable'); state.session={...user,auth_mode:'ssh'}; return respond(state.session);
@@ -57,7 +60,7 @@ function page(language, offline = false) {
         default: return respond(null);
       }
     },0);
-  };
+  }};
   `;
   return html.replace('<script src="app.js"></script>', '<script>'+mock+'</script><script>'+fs.readFileSync(path.join(__dirname,'app.js'),'utf8')+'</script>');
 }
@@ -207,7 +210,7 @@ function page(language, offline = false) {
     assert.equal(await tab.evaluate(()=>{const field=document.getElementById('unwrap-data').getBoundingClientRect(),panel=document.getElementById('unwrap-panel').getBoundingClientRect();return Math.abs(field.left-panel.left)<1 && Math.abs(field.right-panel.right)<1 && Math.abs(field.bottom-panel.bottom)<12}),true,'Read textarea anchors left/right/bottom');
     await tab.setViewport({width:920,height:600});
 
-    await click('#unwrap-copy'); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-unwrapped-text');
+    await click('#unwrap-copy'); await tab.waitForFunction(()=>!document.getElementById('unwrap-copy').disabled); assert.equal(await tab.evaluate(()=>window.testCopied.pop()),'synthetic-unwrapped-text');
     await tab.type('#unwrap-token','already-used'); await tab.evaluate(()=>window.testState.unwrapError=true);
     await click('#unwrap-submit'); await tab.waitForFunction(()=>!document.getElementById('unwrap-submit').disabled);
     assert.equal(await tab.$eval('#unwrap-result',n=>n.hidden),true);

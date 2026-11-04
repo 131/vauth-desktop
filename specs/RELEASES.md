@@ -2,77 +2,94 @@
 
 ## Publishing a release
 
-1. From a clean `master`, let [ppackage](https://github.com/131/ppackage)
-   bump the version marker (`// version:` in `go.mod`), commit and tag, then
-   push. Never create tags or GitHub releases by hand.
+From a clean `master`, [ppackage](https://github.com/131/ppackage) aligns root
+version markers and creates the version commit/lightweight tag:
 
-   ```sh
-   ppackage version patch   # or minor, major, X.Y.Z, X.Y.Z-beta.N
-   git push origin master vX.Y.Z
-   ```
+```sh
+ppackage version patch   # or minor, major, X.Y.Z, X.Y.Z-beta.N
+git push origin master vX.Y.Z
+```
 
-   Name the tag: ppackage creates a lightweight tag, which
-   `git push --follow-tags` does not send.
-
-   `-beta.N` versions are published as prereleases.
-
-2. The `release` workflow (`.github/workflows/release.yml`, GitHub environment
-   `production`) runs the tests, then GoReleaser
-   ([`.goreleaser.yaml`](../.goreleaser.yaml)) builds
-   `vauth-desktop-windows-amd64.exe`, signs it with Authenticode through
-   `SIGNING_SERVER` ([131/gh-actions](https://github.com/131/gh-actions)
-   `sign-binaries`) and publishes it with `SHA256SUMS`.
-
-3. Promote the tag to a channel in [`manifest.json`](../manifest.json) and push
-   to the default branch: installed applications follow it.
-
-The `production` environment protects the signing secret (restrict it to `v*`
-tags); it is not a release channel.
+Push the exact tag: `--follow-tags` does not send lightweight tags. Never
+create release tags or GitHub releases by hand. `-beta.N` tags are prereleases.
+The `release` workflow runs tests, then [GoReleaser](../.goreleaser.yaml) builds
+`vauth-desktop-windows-amd64.exe`, signs via `SIGNING_SERVER` and publishes it
+with `SHA256SUMS`; `wails3 updater manifest` then attaches its
+[Wails update manifest](https://github.com/wailsapp/wails/blob/v3.1.0/docs/mpress/content/reference/update-manifest.md)
+`update.json` (SHA-512 digest, absolute asset URL). The manifest is generated
+from the asset downloaded back from the published release, so its name, size and digest describe the distributed signed bytes.
+The GitHub `production` environment protects signing credentials; it is not
+a release channel.
 
 ## Channels
 
-`manifest.json`, at the root of the upstream default branch, maps each channel
-to a release tag:
+A channel is a static manifest committed upstream, `updates/<channel>.json`:
+[production](../updates/production.json) and [beta](../updates/beta.json),
+the list of the settings selector. Once CI, assets and signature are verified,
+promote a release by committing its manifest, then push:
 
-```json
-{
-  "production": "v0.1.0",
-  "beta": "v0.2.0-beta.1"
-}
+```sh
+curl -fsSL https://github.com/131/vauth-desktop/releases/download/vX.Y.Z/update.json -o updates/production.json
 ```
 
-The application reads it from
-`https://raw.githubusercontent.com/<owner>/<repo>/HEAD/manifest.json` and keeps
-it in its settings cache (see [SETTINGS.md](SETTINGS.md#channels)). The channel
-selector of the settings panel lists its keys.
+The app reads
+`https://raw.githubusercontent.com/<owner>/<repo>/HEAD/updates/<channel>.json`
+through the Wails updater `endpoint` provider. A missing or invalid manifest
+is a check error, shown in settings; no update is installed.
+
+Published pre-Wails versions (through v2.2.1) still follow the root [`manifest.json`](../manifest.json)
+(channel → tag) and `SHA256SUMS`: keep promoting there too until no such
+installation remains.
 
 ## Update
 
-At startup (and on *Check for updates*), when the followed channel points to a
-newer version than the running one, a notification offers the update. The
-binary is downloaded next to the executable and installed only if:
+Each GUI document requests a check; *Check for updates* runs it again.
+Tray-only startup does not trigger the page-driven check. A newer followed
+version produces an install notification in the GUI. The
+[Wails updater](https://github.com/wailsapp/wails/blob/v3.1.0/docs/mpress/content/guides/updater.md) downloads
+the executable beside the running one; it is accepted only when:
 
-- its SHA-256 matches the release `SHA256SUMS`;
-- Windows trusts its Authenticode signature (whole chain, revocation checked);
-- its signer is the same as the running executable's.
+- the manifest carries a digest and the download matches it;
+- Windows trusts the Authenticode chain, including revocation;
+- the signing certificate's encoded subject matches the running executable's.
 
-The new version then replaces the old one and restarts; the previous binary is
-removed at the next start. The executable's folder must be writable by the user.
+Checks and update preference changes are serialized with installation. One
+install transaction checks the requested tag, downloads/verifies that release
+and starts the restart helper; another channel check cannot replace its pending
+release. A failed verification does not restart and can be retried.
 
-- Downgrades are never offered: switching from `beta` back to `production`
-  waits for the next production release.
-- Unsigned or development builds never update themselves: the first install
-  must be a signed release, and an end-to-end update can only be observed from
-  the second release.
-- `update.enable: false` in the settings disables every request to GitHub.
+On restart, a Wails helper process waits for the application to exit, swaps
+the executable and starts it again. Its directory must be writable. Downgrades
+are not offered; switching back from beta waits for a newer production release.
+Unsigned/development builds cannot self-update. `update.enable: false`
+disables every GitHub request.
 
-`VAUTH_VERIFY_SIGNED=<signed exe> go test ./internal/update` runs the
-Authenticode check against a real signed binary on Windows.
+On Windows, `VAUTH_VERIFY_SIGNED=<signed exe> go test ./internal/update`
+checks the actual signature-verification path.
 
-## Update interaction
+## Windows update leftovers
 
-Download/install stays disabled with a spinner through checksum and signature
-verification and relaunch. Notifications follow the active modal host and return
-to the page when it closes, so the backdrop does not intercept an action click.
-A failed install keeps its action available for retry. A missing manifest is
-reported explicitly rather than as a generic download failure.
+When Windows still holds the previous executable, Wails renames it to
+`<executable>.old.<Unix nanoseconds>` before placing the new executable at its
+normal path. Its immediate removal can fail while the helper/kernel still
+holds the file; Wails also sweeps older leftovers during a later update.
+
+The resident app adds startup cleanup: a background worker captures regular
+files beside its own executable with either `.old` (pre-Wails clients) or
+`.old.` plus a decimal timestamp. It attempts removal six times, with five two-second waits,
+retrying only failed removals. A vanished file is already cleaned. Final
+failures are logged once and retried at the next application startup.
+
+The current executable, other applications' files, `.bak` backups, directories
+and symlinks are not cleanup targets. Cleanup does not block the tray or create
+a GUI, runs even with update checks disabled, and does not run in the updater
+helper or second-instance process. The legacy `--updated` argument is tolerated on first launch from an older
+client; Wails owns subsequent restart/instance handling. Other platforms do
+not perform this cleanup. Only Windows amd64 is released; future OS artifacts
+require native packaging and verification policy before promotion.
+
+## Installation feedback
+
+The install action stays disabled with a spinner through download,
+verification and restart. Failure restores it for retry. Toasts belong to the
+currently open modal dialog, so their first click is actionable.

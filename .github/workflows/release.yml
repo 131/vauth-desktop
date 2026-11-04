@@ -18,6 +18,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
       - run: go vet ./... && go test ./... && GOOS=windows go vet ./...
       - uses: actions/checkout@v4
         with:
@@ -31,3 +32,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SIGNING_SERVER: ${{ secrets.SIGNING_SERVER }}
+      # Wails update manifest of the signed asset; promoting a channel commits
+      # it as updates/<channel>.json (specs/RELEASES.md).
+      # Built from the published asset: GoReleaser renames binaries on upload only.
+      - run: |
+          gh release download "$GITHUB_REF_NAME" -p vauth-desktop-windows-amd64.exe -D dist/published
+          CGO_ENABLED=0 go run github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0 updater manifest \
+            -version "$GITHUB_REF_NAME" \
+            -url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME" \
+            -output dist/update.json dist/published/vauth-desktop-windows-amd64.exe
+          gh release upload "$GITHUB_REF_NAME" dist/update.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

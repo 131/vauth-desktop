@@ -12,11 +12,13 @@ document.addEventListener('keydown', event => {
   if (key === 'f5' || (event.ctrlKey && ['r', 'p', 'f', 'g', 'u', 's', '+', '-', '=', '0'].includes(key))) event.preventDefault();
 });
 for (const type of ['dragover', 'drop']) document.addEventListener(type, event => { if (!editable(event.target)) event.preventDefault(); });
-// Go answers vauth_call asynchronously through window.vauthDone.
-const pending = new Map(); let sequence = 0;
+// Raw Wails messages retain the page ID across reloads; Go replies asynchronously.
+const pending = new Map(), outbox = []; let sequence = 0;
+const send = message => window._wails?.invoke ? window._wails.invoke(message) : outbox.push(message);
+window.addEventListener('wails:runtime-config-ready', () => { window._wails.invoke('wails:runtime:ready'); outbox.splice(0).forEach(send); });
 const pageId = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
 window.vauthDone = ({id, page, error, expired, result}) => { if (page !== pageId) return; const request = pending.get(id); if (!request) return; pending.delete(id); if (error) { const failure = new Error(error); failure.expired = expired; request.reject(failure); } else request.resolve(result); };
-const call = (method, ...args) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, {resolve, reject}); window.vauth_call(id, pageId, method, args); });
+const call = (method, ...args) => new Promise((resolve, reject) => { const id = ++sequence; pending.set(id, {resolve, reject}); send(JSON.stringify({id, page: pageId, method, args})); });
 let session = null, database = {values: {}, version: 0}, identity = {}, editing = null;
 let databaseLoaded = false, authEpoch = 0, activeTab = 'secrets';
 const kv = {mounts: [], mount: '', folder: '', keys: [], doc: null, path: '', request: 0, dirty: true};
@@ -69,12 +71,7 @@ function confirmed(message) {
 }
 function showDialog(dialog) { dialog.showModal(); flushToasts(); }
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', flushToasts);
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); return; } catch {}
-  const area = document.createElement('textarea'); area.value = text; document.body.append(area); area.select();
-  const done = document.execCommand('copy'); area.remove();
-  if (!done) throw new Error(t('copy.failed'));
-}
+async function copy(text) { await call('copy', text); }
 async function load(renew = false) { await startSession(await call('connect', renew)); }
 async function startSession(next) {
   clearWrapping();
@@ -391,11 +388,11 @@ function updates(release) {
 call('update_check').then(updates).catch(() => {}); // silent: errors stay in the panel
 $('check-update').addEventListener('click', () => run($('check-update'), async () => {
   offered = '';
-  const release = await call('update_check', true);
+  const release = await call('update_check');
   updates(release);
   if (release.error) throw new Error(release.error);
   if (release.development && release.latest) notice(t('update.dev.notice', release.latest));
-  else if (release.enabled && !release.available) notice(t('update.uptodate', release.current, release.channel, release.latest || t('update.none')));
+  else if (release.enabled && !release.available) notice(t('update.uptodate', release.current, release.channel));
 }));
 $('open-release').addEventListener('click', () => run($('open-release'), () => call('update_open')));
 $('update-enable').addEventListener('change', () => run($('update-enable'), async () => {
@@ -407,10 +404,17 @@ $('update-enable').addEventListener('change', () => run($('update-enable'), asyn
 $('channel').addEventListener('change', () => run($('channel'), async () => {
   const release = await call('update_channel', $('channel').value);
   updates(release);
-  if (!release.available) notice(t('update.channel.selected', release.channel, release.latest || t('update.none')));
+  if (!release.available) notice(t('update.channel.selected', release.channel));
 }));
 // The language applies at once: Go renders the page again.
 const languageNames = {'fr-fr': 'Français', 'en-us': 'English', 'zh-cn': '简体中文'};
 $('language').replaceChildren(...window.I18N.languages.map(name => new Option(languageNames[name] || name, name, false, name === window.I18N.language)));
 $('language').addEventListener('change', () => run($('language'), () => call('set_language', $('language').value)));
+
+// Custom frame actions are session-local RPCs, dispatched by Wails on the UI thread.
+$('minimize-window').addEventListener('click', () => call('window', 'minimize').catch(error => notice(error.message, true)));
+$('close-window').addEventListener('click', () => call('window', 'close').catch(error => notice(error.message, true)));
+document.querySelector('.window-drag').addEventListener('mousedown', event => { if (event.button === 0) { event.preventDefault(); call('window', 'drag').catch(() => {}); } });
+for (const edge of document.querySelectorAll('[data-resize]')) edge.addEventListener('mousedown', event => { if (event.button === 0) { event.preventDefault(); call('window', edge.dataset.resize).catch(() => {}); } });
+
 })();

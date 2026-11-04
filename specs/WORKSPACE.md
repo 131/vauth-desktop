@@ -159,11 +159,11 @@ silently switch authentication methods.
   personal database cannot block first key enrollment.
 - Callback registration is reviewed in both Entra and Vault owners; applies
   remain operator-owned. Real SSO/first-enrollment validation is pending.
-- Both language catalogs cover all new labels and errors. Preserve the compact
+- All three language catalogs cover all labels and errors. Preserve the compact
   layout, minimum window size, tray behavior, SSH key tab and update settings.
 - Go tests/vet, Windows cross-build and a Windows UI smoke test pass. Real Vault
   validation records permissions and engine version without recording secrets.
 - Update the user README and illustrations to the implemented interface before
-  release; do not present this proposal as a shipped feature.
+  release; describe the current embedded interface and keep screenshots synthetic.
 - Version bump, tag, release publication and channel promotion wait for the
   operator's explicit release instruction after implementation review.

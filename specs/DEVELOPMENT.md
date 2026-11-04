@@ -1,51 +1,86 @@
 # Development
 
-Read the [development guideline](dev_guideline.md): boring is good.
+Read [dev_guideline.md](dev_guideline.md): boring is good.
 
 ## Build and tests
 
+Go 1.26 and Wails v3.1 are pinned in `go.mod`. Windows builds do not need cgo:
+
 ```sh
 gofmt -l .
-go vet ./... && go test -race ./... && GOOS=windows go vet ./...
+go vet ./... && go test ./... && GOOS=windows CGO_ENABLED=0 go vet ./...
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
   -ldflags "-H windowsgui -s -w -X main.version=<version>" -o vauth-desktop.exe .
 ```
 
-The window uses the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
-(shipped with Windows 10 and 11) through `github.com/jchv/go-webview2`, replaced by the pinned
-[131/go-webview2 fork](https://github.com/131/go-webview2), without cgo. Its
-`Close`, `Show` and `ProcessDispatch` APIs let the resident host release and
-recreate a browser without quitting its message loop. Vault calls run in Go, off the UI thread. `VAUTH_DESKTOP_DEBUG=1` enables
-the developer tools. WebView2 data lives in the user cache directory
-(`vauth-desktop/webview`).
+Linux compilation/tests need GTK4/WebKitGTK development libraries
+(`libgtk-4-dev libwebkitgtk-6.0-dev`); CI installs them. Only Windows amd64
+artifacts are released. Linux/macOS have a shared Wails entrypoint/runtime,
+with their desktop behavior, packaging and update trust policy still
+unvalidated and unreleased.
+
+## Resident runtime and disposable window
+
+[TRAY.md](TRAY.md) defines lifetime, input and frame behavior. `main.go` creates
+one `App` and `Runtime`; Wails owns the UI thread, single-instance lock, native
+tray, WebView2/WebKit and frameless window. `Runtime` retains the Vault client
+and optional `WindowSession`. Close destroys that window/browser, not the
+Vault session or tray. Quit closes the resident client and its OIDC listener.
+Minimize (custom control or native event) hides the existing session.
+
+The UI is inline HTML/CSS/JS, without generated bindings or a frontend build.
+It waits for `wails:runtime-config-ready`, posts raw `{id,page,method,args}`
+messages, and receives `{id,page,error,expired,result}` through `vauthDone`.
+Only the resident runtime's current window can enter the bridge; the page CSP
+blocks remote/nested content. Wails' inline-HTML origin flags are not used as
+window identity.
+Backend work runs off-thread; replies stay bound to the original window and
+are dropped after Close. The random page ID rejects replies from an earlier
+HTML document after language reload. Vault expiry still reaches the UI through
+`expired`; session/auth epochs and retained-draft guards are unchanged.
+
+`VAUTH_DESKTOP_DEBUG=1` enables DevTools. WebView2 data stays in the user cache
+under `vauth-desktop/webview`. A known Wails v3.1 limitation remains: Quit during
+WebView2 controller initialization can exit with code 1; lifecycle tests report
+this explicitly as a warning, not a clean exit.
 
 ## Layout
 
-| Path | |
-|------|-|
-| `app.go`, `main_windows.go` | UI methods and startup |
-| `runtime_windows.go`, `window_session_windows.go` | resident services and disposable GUI/bridge |
-| `ui/` | page, style and script, embedded and inlined into one document |
-| `internal/i18n/messages.json` | every user-facing string, French and English, shared by Go and `ui/` |
-| `internal/vault` | Vault client over vauth-login |
-| `internal/update` | channels, download, `SHA256SUMS` and Authenticode checks |
-| `internal/desktop` | hidden Win32 host, single instance, UI dispatch and native frame lifecycle |
-| `internal/tray` | resident notification area icon and Open/Quit menu |
-| `settings/` | `settings.yml` ([SETTINGS.md](SETTINGS.md)) |
-| `winres/` | icon and Windows manifest |
-| `specs/` | these documents |
+| Path | Responsibility |
+| --- | --- |
+| `app.go`, `main.go` | Backend API and shared bootstrap |
+| `runtime.go`, `window_session.go` | Resident ownership and disposable page-aware bridge |
+| `ui/` | Embedded workspace, translations, custom frame and native RPC |
+| `internal/vault` | Existing vauth-login, SSO, KV, wrapping and expiry policies |
+| `internal/tray` | Native icon and Open/Quit menu |
+| `internal/clipboard` | Windows private clipboard and platform fallback |
+| `internal/update` | Serialized Wails updater, static channel feed, Authenticode and cleanup |
+| `internal/i18n`, `settings/` | Three catalogs and preferences |
+| `winres/`, `scripts/` | Icons/manifest and native integration checks |
 
-## Translations
+## Native integration checks
 
-`internal/i18n/messages.json` holds `fr-fr` (default), `en-us` and `zh-cn` (Simplified Chinese). Go uses
-`i18n.T` / `i18n.Errorf`; the page gets the catalog as `window.I18N` and
-`{{key}}` placeholders in `ui/index.html`. Tests check that both catalogs have
-the same keys and that every key used exists.
+Windows CI ensures WebView2, runs `TestNativeSessionBridge` with
+`VAUTH_DESKTOP_NATIVE_TESTS=1`, then `scripts/test-webview-lifecycle.ps1` against
+its own test executable. The probe uses synthetic HTML/version RPCs, never
+Vault or an agent. The lifecycle script isolates APPDATA/LOCALAPPDATA, disables
+update checks and uses an unavailable agent. It verifies tray-only startup,
+three close/reopen cycles with browser process exit, second launch, native
+minimize/hide with the same browser retained, rapid reopening and Quit.
+Never point the script at the installed executable; isolate the single-instance
+ID with a temporary Go overlay for local tests beside a running installation.
 
-## Icon and manifest
+Unit tests preserve page IDs/expiry flags and closed-session guards, serialize
+channel changes through download/verification/restart, reject bad digests and
+signatures, and exercise bounded `.old` cleanup with a real Windows sharing
+lock. See [RELEASES.md](RELEASES.md#windows-update-leftovers).
 
-The icon (`winres/icon.py`) and the Windows manifest are linked through
-`rsrc_windows_amd64.syso`. After changing them, regenerate it:
+## Translations and icon
+
+`internal/i18n/messages.json` holds `fr-fr`, `en-us` and `zh-cn`. Tests compare
+all three catalogs and every UI key. `winres/icon.png` is the shared tray/app
+icon; the Windows icon/manifest are linked through `rsrc_windows_amd64.syso`.
+After editing resources:
 
 ```sh
 (cd winres && python3 icon.py)
@@ -75,34 +110,3 @@ Go tests reject internal operator/organization identifiers in repository content
 Before release, additionally scan the executable as UTF-8 and UTF-16 text, then
 verify Windows SSO and an explicitly confirmed public-key enrollment. No release,
 version bump or channel promotion happens as part of the development build.
-
-## Native dispatch and update feedback
-
-The resident host dispatch queue posts to its HWND so callbacks run inside native modal
-loops. Their completion also wakes WebView2 binding callbacks. Update actions
-remain disabled with a spinner until download, checksum/signature verification
-and relaunch finish. Toasts move to the active dialog host so a backdrop does
-not intercept the first action click.
-
-## Resident tray and disposable window
-
-Startup creates only the hidden native host and tray icon. Open (tray click,
-menu or second launch) creates a hidden WebView2 session and then publishes both
-its native frame and browser controller. Close detaches the frame callbacks and
-closes the controller/window; it does not close the Vault client or quit the
-host. Minimize keeps the existing hidden GUI; Open restores it.
-
-The Vault client, settings and updater belong to the runtime. In-flight backend
-operations can finish after GUI closure; their replies remain bound to the old
-WindowSession and are dropped once it is closed. The UI page identifier also
-protects against stale replies after a language reload. Quit/update restart
-ends the resident host and closes the optional GUI and Vault client.
-
-Native Windows tests cover host dispatch without a GUI, close without quitting,
-close retries and stale callbacks. Set `VAUTH_DESKTOP_NATIVE_TESTS=1` to run the
-real WebView2 bridge test; it uses temporary settings and a synthetic Vault
-backend, never the user's credentials. CI also tests the pinned dependency and
-runs `scripts/test-webview-lifecycle.ps1 -Executable ./vauth-desktop.exe` to check
-browser process teardown, repeated opening, second launch and Quit during init.
-The lifecycle script requires a disposable environment with no existing app
-instance; do not run it against an installed user's process or real Vault profile.

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -18,14 +17,12 @@ import (
 const (
 	DefaultUpstream = "https://github.com/131/vauth-desktop"
 	DefaultChannel  = "production"
-	DefaultTTL      = 86400
 )
 
-// Settings is the whole file. It holds preferences and caches, never secrets.
+// Settings is the whole file. It holds preferences, never secrets.
 type Settings struct {
-	Update         Update          `yaml:"update"`
-	Language       string          `yaml:"language"`
-	RemoteChannels *RemoteChannels `yaml:"remote_channels,omitempty"`
+	Update   Update `yaml:"update"`
+	Language string `yaml:"language"`
 }
 
 // Update configures auto-update.
@@ -33,21 +30,6 @@ type Update struct {
 	Enable   bool   `yaml:"enable"`
 	Upstream string `yaml:"upstream"`
 	Channel  string `yaml:"channel"`
-}
-
-// RemoteChannels caches the upstream manifest.json (channel → release tag)
-// for TTL seconds after Fetched.
-type RemoteChannels struct {
-	Upstream string            `yaml:"upstream"`
-	TTL      int               `yaml:"ttl"`
-	Fetched  time.Time         `yaml:"fetched"`
-	List     map[string]string `yaml:"list"`
-}
-
-// Fresh reports whether the cache describes upstream and is still valid.
-func (r *RemoteChannels) Fresh(upstream string, now time.Time) bool {
-	return r != nil && r.Upstream == upstream && len(r.List) > 0 &&
-		now.Before(r.Fetched.Add(time.Duration(r.TTL)*time.Second))
 }
 
 // Defaults are the settings of a missing file.
@@ -67,7 +49,7 @@ func (s *Settings) normalize() {
 	s.Language = i18n.Normalize(s.Language)
 }
 
-const header = "# vauth desktop settings: https://github.com/131/vauth-desktop/v2/blob/master/specs/SETTINGS.md\n"
+const header = "# vauth desktop settings: https://github.com/131/vauth-desktop/blob/master/specs/SETTINGS.md\n"
 
 // Store is the settings file. A missing file means defaults; an unreadable
 // one is reported and left untouched.
