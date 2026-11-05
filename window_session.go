@@ -28,9 +28,11 @@ func NewWindowSession(app *App, wails *application.App, closed func(*WindowSessi
 	// UI-only callbacks belong to this session; the copied facade shares the
 	// resident stores/services and never mutates their lifetime.
 	s := &WindowSession{app: *app}
+	s.app.Window = s.WindowAction
 	s.view = wails.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: tray.WindowTitle, Width: 920, Height: 600, MinWidth: 600, MinHeight: 380,
-		Hidden: true, InitialPosition: application.WindowCentered,
+		Frameless: true, Hidden: true, InitialPosition: application.WindowCentered,
+		Windows:         application.WindowsWindow{NonClientRegionSupport: true, WebView2CompositionHosting: true},
 		DevToolsEnabled: os.Getenv("VAUTH_DESKTOP_DEBUG") != "",
 		HTML:            ui.Page(i18n.Current()),
 	})
@@ -94,4 +96,26 @@ func bridgeResponse(call bridgeCall, result any, err error) []byte {
 	}
 	payload, _ := json.Marshal(map[string]any{"id": call.ID, "page": call.Page, "error": message, "expired": errors.Is(err, vault.ErrSessionExpired), "result": result})
 	return payload
+}
+
+// Caption actions delegate to Wails; borders/drag/hit testing remain native.
+func (s *WindowSession) WindowAction(action string) error {
+	if s.closed.Load() {
+		return i18n.Errorf("err.window")
+	}
+	switch action {
+	case "minimize":
+		s.view.Hide()
+	case "maximize":
+		if s.view.IsMaximised() {
+			s.view.Restore()
+		} else {
+			s.view.Maximise()
+		}
+	case "close":
+		s.view.Close()
+	default:
+		return i18n.Errorf("err.window")
+	}
+	return nil
 }

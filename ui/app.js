@@ -411,4 +411,22 @@ const languageNames = {'fr-fr': 'Français', 'en-us': 'English', 'zh-cn': '简�
 $('language').replaceChildren(...window.I18N.languages.map(name => new Option(languageNames[name] || name, name, false, name === window.I18N.language)));
 $('language').addEventListener('change', () => run($('language'), () => call('set_language', $('language').value)));
 
+for (const action of ['minimize','maximize','close']) $('caption-'+action).addEventListener('click',()=>call('window',action).catch(error=>notice(error.message,true)));
+// Inline HTML does not reliably start the runtime region tracker. Register the
+// caption rectangles explicitly; Windows still owns drag/double-click/resize.
+function syncCaptionRegions() {
+ if (!window._wails?.invoke) return;
+ const scale = window.devicePixelRatio || 1;
+ const regions = [['caption','.brand'],['caption','.caption-drag'],['minimize','#caption-minimize'],['maximize','#caption-maximize'],['close','#caption-close']].map(([kind,selector])=>{
+  const r=document.querySelector(selector).getBoundingClientRect();
+  return {kind,left:Math.floor(r.left*scale),top:Math.floor(r.top*scale),right:Math.ceil(r.right*scale),bottom:Math.ceil(r.bottom*scale)};
+ }).filter(r=>r.right>r.left&&r.bottom>r.top);
+ window._wails.invoke('wails:non-client-region:'+JSON.stringify({version:1,regions}));
+}
+const captionChanged=()=>requestAnimationFrame(syncCaptionRegions);
+window.addEventListener('wails:runtime-config-ready',captionChanged);
+window.addEventListener('resize',captionChanged);
+new ResizeObserver(captionChanged).observe(document.querySelector('header'));
+captionChanged();
+
 })();

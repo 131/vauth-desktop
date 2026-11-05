@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/131/vauth-desktop/v2/internal/vault"
 	"testing"
+
+	"github.com/131/vauth-desktop/v2/internal/vault"
 )
 
 func TestBridgePreservesPageAndExpiry(t *testing.T) {
@@ -34,5 +35,12 @@ func TestClosedSessionDropsCallsAndReplies(t *testing.T) {
 	if calls != 0 {
 		t.Fatal("closed session executed a new call")
 	}
+}
 
+func TestClosedSessionRejectsCaptionAction(t *testing.T) {
+	s := &WindowSession{}
+	s.closed.Store(true)
+	if err := s.WindowAction("maximize"); err == nil {
+		t.Fatal("closed caption action accepted")
+	}
 }

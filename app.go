@@ -41,6 +41,8 @@ type App struct {
 	Open    func(string) error
 	Agent   func() string
 	Updater *update.Updater
+	// Window controls the caption actions of this GUI session.
+	Window func(string) error
 	// Copy uses the resident platform clipboard.
 	Copy func(string) error
 	// Reload renders the page again, in the current language.
@@ -70,6 +72,15 @@ func (a *App) Handle(method string, args []json.RawMessage) (any, error) {
 	switch method {
 	case "version":
 		return version, nil
+	case "window":
+		action, err := arg[string](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if a.Window == nil {
+			return nil, i18n.Errorf("err.window")
+		}
+		return nil, a.Window(action)
 	case "copy":
 		value, err := arg[string](args, 0)
 		if err != nil {

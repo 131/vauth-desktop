@@ -19,6 +19,15 @@ public class LifecycleWin {
  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr hwnd, int index);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int width, int height, uint flags);
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+ [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
+ [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr hwnd);
+ public static IntPtr Point(int x,int y) { return new IntPtr((y << 16) | (x & 0xffff)); }
+ public static long Hit(IntPtr hwnd,int x,int y) { return SendMessage(hwnd,0x84,IntPtr.Zero,Point(x,y)).ToInt64(); }
+ public static long CaptionHit(IntPtr hwnd) { Rect r;GetWindowRect(hwnd,out r);return Hit(hwnd,(r.Left+r.Right)/2,r.Top+18); }
+ public static long BorderHit(IntPtr hwnd) { Rect r;GetWindowRect(hwnd,out r);return Hit(hwnd,r.Left+2,(r.Top+r.Bottom)/2); }
+ public static void CaptionDoubleClick(IntPtr hwnd) { Rect r;GetWindowRect(hwnd,out r);SendMessage(hwnd,0xA3,new IntPtr(2),Point((r.Left+r.Right)/2,r.Top+18)); }
+
  public static int ClientWidth(IntPtr hwnd) { Rect r; return GetClientRect(hwnd, out r) ? r.Right-r.Left : 0; }
  public static int ClientHeight(IntPtr hwnd) { Rect r; return GetClientRect(hwnd, out r) ? r.Bottom-r.Top : 0; }
 
@@ -104,12 +113,15 @@ try {
   $gui = [LifecycleWin]::Find($process.Id, 'vauth desktop')
   Wait-For { @(Browser-Tree $process.Id).Count -gt 0 } 'No browser processes on Open'
   if ($cycle -eq 1) {
-   $style = [LifecycleWin]::GetWindowLong($gui, -16)
-   if (($style -band 0x00C00000) -ne 0x00C00000 -or ($style -band 0x00040000) -eq 0) { throw 'Missing native caption or resizable border' }
+   Wait-For { [LifecycleWin]::CaptionHit($gui) -eq 2 -and [LifecycleWin]::BorderHit($gui) -eq 10 } 'Missing native caption or resize hit testing'
+   [LifecycleWin]::CaptionDoubleClick($gui)
+   Wait-For { [LifecycleWin]::IsZoomed($gui) } 'Caption double-click did not maximize'
+   [LifecycleWin]::CaptionDoubleClick($gui)
+   Wait-For { -not [LifecycleWin]::IsZoomed($gui) } 'Caption double-click did not restore'
    $width = [LifecycleWin]::ClientWidth($gui); $height = [LifecycleWin]::ClientHeight($gui)
    if (-not [LifecycleWin]::SetWindowPos($gui, [IntPtr]::Zero, 0, 0, ($width + 200), ($height + 200), 6)) { throw 'Native resize failed' }
    Wait-For { [LifecycleWin]::ClientWidth($gui) -gt $width -and [LifecycleWin]::ClientHeight($gui) -gt $height -and [LifecycleWin]::VisibleBrowser($gui) } 'Client/browser did not follow native resize'
-   'PASS: standard Windows caption and resize grow the client area with browser retained'
+   'PASS: native caption drag hit testing, double-click maximize/restore, border resize and retained browser'
   }
   # Let the page's async bindings and lock screen initialize before closing.
   Start-Sleep -Seconds 2

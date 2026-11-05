@@ -23,7 +23,7 @@ unvalidated and unreleased.
 
 [TRAY.md](TRAY.md) defines lifetime, input and frame behavior. `main.go` creates
 one `App` and `Runtime`; Wails owns the UI thread, single-instance lock, native
-tray, WebView2/WebKit and standard framed, resizable window. `Runtime` retains the Vault client
+tray, WebView2/WebKit and hybrid-caption, natively resizable window. `Runtime` retains the Vault client
 and optional `WindowSession`. Close destroys that window/browser, not the
 Vault session or tray. Quit closes the resident client and its OIDC listener.
 The native Minimize control/event hides the existing session.
@@ -65,7 +65,7 @@ Windows CI ensures WebView2, runs `TestNativeSessionBridge` with
 its own test executable. The probe uses synthetic HTML/version RPCs, never
 Vault or an agent. The lifecycle script isolates APPDATA/LOCALAPPDATA, disables
 update checks and uses an unavailable agent. It verifies tray-only startup,
-standard caption/resize styles and client-area resize, three close/reopen
+native caption/edge hit testing, double-click maximize/restore and client-area resize, three close/reopen
 cycles with browser process exit, second launch, native minimize/hide with the same browser retained, rapid reopening and Quit.
 Never point the script at the installed executable; isolate the single-instance
 ID with a temporary Go overlay for local tests beside a running installation.
@@ -110,3 +110,13 @@ Go tests reject internal operator/organization identifiers in repository content
 Before release, additionally scan the executable as UTF-8 and UTF-16 text, then
 verify Windows SSO and an explicitly confirmed public-key enrollment. No release,
 version bump or channel promotion happens as part of the development build.
+
+## Hybrid frame integration
+
+`WindowSession` enables frameless mode with Windows decorations retained,
+WebView2 composition hosting and non-client region support. Header appearance
+is CSS; window movement, border resize and caption/system-menu behavior are
+native. `syncCaptionRegions` publishes only the compact header/button rectangles
+to the Wails native handler at readiness and after layout/resize. Caption actions
+are session-local RPCs to Wails; closed sessions reject them. No Win32 host or
+Wails fork is maintained by this application.

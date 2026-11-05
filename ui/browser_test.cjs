@@ -25,6 +25,7 @@ function page(language, offline = false) {
   const user = {login:'jdoe',vault_addr:'https://vault.example.test',profile:{VAUTH_USER_LOGIN:'jdoe',VAUTH_USER_NAME:'John Doe',VAUTH_USER_MAIL:'jdoe@example.test',CUSTOM_ID:'profile'},fixed_vars:['VAUTH_USER_LOGIN','VAUTH_USER_NAME','VAUTH_USER_MAIL'],auth_mode:'ssh'};
   const typed = {text:'synthetic-hidden-value',flag:true,number:2,array:[1,null],nested:{ok:false}};
   window._wails = {invoke: message => {
+    if (message.startsWith('wails:non-client-region:')) { window.testCaptionRegions = JSON.parse(message.slice('wails:non-client-region:'.length)); return; }
     if (message.startsWith('wails:')) return;
     const {id, page, method, args} = JSON.parse(message);
     const state = window.testState; state.trace.push({method,args});
@@ -297,6 +298,11 @@ function page(language, offline = false) {
     await tab.waitForSelector('#unwrap-result:not([hidden])');
     assert.equal(await tab.$eval('#unwrap-data',n=>n.value),'synthetic-unwrapped-text');
     if (process.env.UI_UNWRAP_ZH_SCREENSHOT) await tab.screenshot({path:process.env.UI_UNWRAP_ZH_SCREENSHOT});
+    await tab.waitForFunction(()=>window.testCaptionRegions?.regions?.length===5);
+    const regions=await tab.evaluate(()=>window.testCaptionRegions);
+    assert.equal(regions.version,1);
+    assert.deepEqual(regions.regions.map(r=>r.kind),['caption','caption','minimize','maximize','close']);
+    assert.ok(regions.regions.every(r=>r.right>r.left&&r.bottom>r.top),'Physical native caption rectangles');
     assert.deepEqual(errors,[],'Browser script errors');
     console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');
   } finally {if(browser) await browser.close();await new Promise(resolve=>server.close(resolve))}

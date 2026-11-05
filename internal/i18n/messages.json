@@ -200,7 +200,8 @@
     "err.digest": "version %s refusée : aucune empreinte dans le manifest",
     "err.copy": "copie impossible",
     "window.minimize": "Réduire",
-    "window.close": "Fermer (reste dans la zone de notification)"
+    "window.close": "Fermer (reste dans la zone de notification)",
+    "window.maximize": "Agrandir / restaurer"
   },
   "en-us": {
     "html.lang": "en",
@@ -403,7 +404,8 @@
     "err.digest": "version %s refused: no digest in the manifest",
     "err.copy": "copy failed",
     "window.minimize": "Minimize",
-    "window.close": "Close (stays in the notification area)"
+    "window.close": "Close (stays in the notification area)",
+    "window.maximize": "Maximize / restore"
   },
   "zh-cn": {
     "html.lang": "zh-CN",
@@ -606,6 +608,7 @@
     "err.digest": "版本 %s 缺少校验摘要。",
     "err.copy": "无法复制到剪贴板。",
     "window.minimize": "隐藏窗口",
-    "window.close": "关闭窗口"
+    "window.close": "关闭窗口",
+    "window.maximize": "最大化 / 还原"
   }
 }
