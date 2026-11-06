@@ -66,11 +66,17 @@ its own test executable. The probe uses synthetic HTML/version RPCs, never
 Vault or an agent. The lifecycle script isolates APPDATA/LOCALAPPDATA, disables
 update checks and uses an unavailable agent. It verifies tray-only startup,
 native caption/edge hit testing, double-click maximize/restore and client-area resize, three close/reopen
-cycles with browser process exit, second launch, native minimize/hide with the same browser retained, rapid reopening and Quit.
+cycles with browser process exit, 14-click native tray bursts during creation,
+while visible and after minimize (counting hidden and visible GUI HWNDs), second
+launch, native minimize/hide with the same browser retained, rapid reopening and
+Quit. Cold controller creation and second-launch forwarding use a 90s timeout.
 Never point the script at the installed executable; isolate the single-instance
 ID with a temporary Go overlay for local tests beside a running installation.
 
-Unit tests preserve page IDs/expiry flags and closed-session guards, serialize
+Unit tests force concurrent/reentrant 14-call bursts during creation and showing,
+verify session reuse and replacement after Close, and reject publication of an
+already-closed construction. They also preserve page IDs/expiry flags and
+closed-session guards, serialize
 channel changes through download/verification/restart, reject bad digests and
 signatures, and exercise bounded `.old` cleanup with a real Windows sharing
 lock. See [RELEASES.md](RELEASES.md#windows-update-leftovers).

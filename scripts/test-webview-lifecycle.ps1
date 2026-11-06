@@ -7,6 +7,7 @@ using System.Text;
 using System.Runtime.InteropServices;
 public class LifecycleWin {
  public delegate bool EnumProc(IntPtr hwnd, IntPtr data);
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string name, string title);
  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc callback, IntPtr data);
  [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr data);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
@@ -39,6 +40,25 @@ public class LifecycleWin {
    return true;
   }, IntPtr.Zero);
   return visible;
+ }
+ public static IntPtr Tray(uint pid) {
+  IntPtr hwnd = IntPtr.Zero;
+  while ((hwnd = FindWindowEx(new IntPtr(-3), hwnd, "WailsWebviewWindow", null)) != IntPtr.Zero) {
+   uint owner; GetWindowThreadProcessId(hwnd, out owner);
+   if (owner == pid) return hwnd;
+  }
+  return IntPtr.Zero;
+ }
+ public static int GuiCount(uint pid) {
+  int count = 0;
+  EnumWindows((hwnd, data) => {
+   uint owner; GetWindowThreadProcessId(hwnd, out owner);
+   var name = new StringBuilder(256); GetClassName(hwnd, name, name.Capacity);
+   var text = new StringBuilder(256); GetWindowText(hwnd, text, text.Capacity);
+   if (owner == pid && name.ToString() == "WailsWebviewWindow" && text.ToString() == "vauth desktop") count++;
+   return true;
+  }, IntPtr.Zero);
+  return count;
  }
  public static IntPtr Find(uint pid, string title) {
   IntPtr found = IntPtr.Zero;
@@ -79,10 +99,29 @@ function Visible-Gui([int]$Owner) {
  return [IntPtr]::Zero
 }
 # Wails' single-instance lock forwards a second launch to the resident process.
+# Its synchronous notification can wait for cold controller creation; use the
+# same 90s initialization budget as Wait-For.
 function Show-Gui {
  $second = Start-Process $Executable -PassThru
  $null = $second.Handle
- if (-not $second.WaitForExit(10000)) { throw 'Second instance did not exit' }
+ if (-not $second.WaitForExit(90000)) { throw 'Second instance did not exit' }
+}
+# Deliver the same native single/double-click notifications as the tray.
+function Tray-Burst {
+ $tray = [LifecycleWin]::Tray($process.Id)
+ if ($tray -eq [IntPtr]::Zero) { throw 'No native tray window' }
+ for ($click = 0; $click -lt 14; $click++) {
+  $message = 0x202
+  if ($click % 2) { $message = 0x203 }
+  if (-not [LifecycleWin]::PostMessage($tray, 0x401, [IntPtr]::Zero, [IntPtr]$message)) { throw 'Tray click failed' }
+ }
+}
+function Assert-SingleGui {
+ # Allow queued clicks and controller initialization to finish before counting
+ # all GUI HWNDs, including hidden duplicates.
+ Wait-For { (Visible-Gui $process.Id) -ne [IntPtr]::Zero } 'Tray burst did not open GUI'
+ Start-Sleep -Seconds 2
+ if ([LifecycleWin]::GuiCount($process.Id) -ne 1) { throw 'Tray burst created multiple GUI windows' }
 }
 function Post([IntPtr]$Window, [uint32]$Message) {
  if (-not [LifecycleWin]::PostMessage($Window, $Message, [IntPtr]::Zero, [IntPtr]::Zero)) { throw 'PostMessage failed' }
@@ -108,7 +147,8 @@ try {
  if ([LifecycleWin]::Find($process.Id, 'vauth desktop') -ne [IntPtr]::Zero -or @(Browser-Tree $process.Id).Count) { throw 'Browser created at startup' }
  'PASS: tray-only startup'
  for ($cycle = 1; $cycle -le 3; $cycle++) {
-  Show-Gui
+  Tray-Burst
+  Assert-SingleGui
   Wait-For { (Visible-Gui $process.Id) -ne [IntPtr]::Zero } 'GUI did not open'
   $gui = [LifecycleWin]::Find($process.Id, 'vauth desktop')
   Wait-For { @(Browser-Tree $process.Id).Count -gt 0 } 'No browser processes on Open'
@@ -123,6 +163,9 @@ try {
    Wait-For { [LifecycleWin]::ClientWidth($gui) -gt $width -and [LifecycleWin]::ClientHeight($gui) -gt $height -and [LifecycleWin]::VisibleBrowser($gui) } 'Client/browser did not follow native resize'
    'PASS: native caption drag hit testing, double-click maximize/restore, border resize and retained browser'
   }
+  Tray-Burst
+  Assert-SingleGui
+  if ([LifecycleWin]::Find($process.Id, 'vauth desktop') -ne $gui) { throw 'Visible tray burst replaced GUI' }
   # Let the page's async bindings and lock screen initialize before closing.
   Start-Sleep -Seconds 2
   $browsers = @(Browser-Tree $process.Id)
@@ -135,7 +178,7 @@ try {
  # Reopening through a second launch must work while only the tray exists.
  $second = Start-Process $Executable -PassThru
  $null = $second.Handle
- if (-not $second.WaitForExit(10000)) { throw 'Second instance did not exit' }
+ if (-not $second.WaitForExit(90000)) { throw 'Second instance did not exit' }
  if ($second.ExitCode -ne 0) { throw 'Second instance failed' }
  Wait-For { (Visible-Gui $process.Id) -ne [IntPtr]::Zero } 'Second launch did not recreate GUI'
  $gui = [LifecycleWin]::Find($process.Id, 'vauth desktop')
@@ -148,7 +191,8 @@ try {
  Wait-For { -not [LifecycleWin]::IsWindowVisible($retainedGui) } 'Minimize did not hide GUI'
  if (-not [LifecycleWin]::IsWindow($retainedGui)) { throw 'Minimize destroyed GUI' }
  if (@(Get-Process -Id $retainedBrowsers -ErrorAction SilentlyContinue).Count -ne $retainedBrowsers.Count) { throw 'Minimize destroyed browser processes' }
- Show-Gui
+ Tray-Burst
+ Assert-SingleGui
  Wait-For { (Visible-Gui $process.Id) -ne [IntPtr]::Zero } 'Hidden GUI did not reopen'
  $gui = [LifecycleWin]::Find($process.Id, 'vauth desktop')
  if ($gui -ne $retainedGui) { throw 'Reopen replaced the minimized session' }

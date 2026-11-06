@@ -16,11 +16,12 @@ import (
 
 // Runtime owns resident Vault services and one optional disposable GUI session.
 type Runtime struct {
-	app    *App
-	wails  *application.App
-	icon   *tray.Tray
-	mu     sync.Mutex
-	window *WindowSession
+	app     *App
+	wails   *application.App
+	icon    *tray.Tray
+	mu      sync.Mutex
+	window  *WindowSession
+	opening bool
 }
 
 func NewRuntime(app *App) *Runtime {
@@ -77,14 +78,37 @@ func (r *Runtime) Run() error {
 func (r *Runtime) session() *WindowSession { r.mu.Lock(); defer r.mu.Unlock(); return r.window }
 func (r *Runtime) OpenWindow()             { application.InvokeAsync(r.openWindow) }
 func (r *Runtime) openWindow() {
-	s := r.session()
-	if s == nil {
-		s = NewWindowSession(r.app, r.wails, r.closed)
+	r.openWindowWith(func() *WindowSession {
+		return NewWindowSession(r.app, r.wails, r.closed)
+	}, (*WindowSession).Show)
+}
+
+func (r *Runtime) openWindowWith(create func() *WindowSession, show func(*WindowSession)) {
+	r.mu.Lock()
+	if r.opening {
+		r.mu.Unlock()
+		return
+	}
+	r.opening = true
+	s := r.window
+	r.mu.Unlock()
+	defer func() {
 		r.mu.Lock()
-		r.window = s
+		r.opening = false
+		r.mu.Unlock()
+	}()
+
+	// Native creation and Show can pump messages and re-enter OpenWindow.
+	// Reserve the opening before either call, without holding the mutex.
+	if s == nil {
+		s = create()
+		r.mu.Lock()
+		if !s.closed.Load() {
+			r.window = s
+		}
 		r.mu.Unlock()
 	}
-	s.Show()
+	show(s)
 }
 func (r *Runtime) closed(s *WindowSession) {
 	r.mu.Lock()

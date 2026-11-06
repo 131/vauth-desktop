@@ -4,6 +4,9 @@
 
 One resident process owns the Vault client, settings, Wails runtime and tray.
 The optional GUI owns one WebView/browser session, not those services.
+At most one GUI session is created or open at a time. Rapid tray clicks,
+Open commands and second launches reuse it. Requests received during native
+creation or showing are coalesced; they cannot create another window.
 
 | Action | GUI | Resident services |
 | --- | --- | --- |
