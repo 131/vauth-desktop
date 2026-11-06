@@ -92,8 +92,8 @@ nav{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);marg
 .tool.on{color:var(--accent);background:#e7eee4}
 .tool.danger:hover{background:#fceee9;border-color:#f0cfc4;color:#9a3b25}
 .entry .actions{justify-content:flex-end}
-/* notifications: overlay stack, top centre */
-#toasts{position:fixed;inset:8px auto auto 50%;translate:-50% 0;margin:0;padding:0;border:0;background:transparent;overflow:visible;width:min(460px,calc(100vw - 24px));flex-direction:column;gap:6px;pointer-events:none}
+/* Keep notification actions below the 34px native caption; popovers do not override Windows hit testing. */
+#toasts{position:fixed;inset:42px auto auto 50%;translate:-50% 0;margin:0;padding:0;border:0;background:transparent;overflow:visible;width:min(460px,calc(100vw - 24px));flex-direction:column;gap:6px;pointer-events:none}
 #toasts:popover-open{display:flex}
 .toast{pointer-events:auto;display:flex;align-items:flex-start;gap:6px;padding:6px 4px 6px 10px;background:#fff;color:#285c35;border:1px solid #cfe0cf;border-left:3px solid #3f8a55;border-radius:5px;box-shadow:0 4px 16px #12322a2e;font-size:12px;animation:toast-in .15s ease-out}
 .toast.error{color:#9a3b25;border-color:#f0cfc4;border-left-color:#c4553a}

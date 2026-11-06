@@ -92,4 +92,5 @@ require native packaging and verification policy before promotion.
 
 The install action stays disabled with a spinner through download,
 verification and restart. Failure restores it for retry. Toasts belong to the
-currently open modal dialog, so their first click is actionable.
+currently open modal dialog and sit below the native caption, so their first
+click reaches the action rather than Windows title-bar hit testing.

@@ -83,11 +83,17 @@ function page(language, offline = false) {
     // Notifications stay in the modal host and retain the same action on error.
     await click('#settings-button'); await tab.evaluate(()=>window.testState.available=true); await click('#check-update');
     await tab.waitForSelector('#settings #toasts .toast button.small');
-    await click('#settings #toasts .toast button.small');
+    const toastBelowCaption = () => tab.evaluate(() => document.querySelector('#toasts .toast button.small').getBoundingClientRect().top >= document.querySelector('header').getBoundingClientRect().bottom);
+    assert.equal(await toastBelowCaption(),true,'Modal update action must not overlap the native caption');
+    await tab.click('#settings #toasts .toast button.small');
     await tab.waitForFunction(()=>document.querySelector('#settings #toasts button.small')?.getAttribute('aria-busy')==='true');
     assert.equal(await tab.$eval('#settings #toasts button.small',n=>n.disabled),true);
     await tab.waitForFunction(()=>!document.querySelector('#settings #toasts button.small')?.disabled);
     await click('#close-settings'); await tab.waitForFunction(()=>document.getElementById('toasts').parentElement===document.body);
+    assert.equal(await toastBelowCaption(),true,'Main-window update action must not overlap the native caption');
+    await tab.click('#toasts .toast button.small');
+    await tab.waitForFunction(()=>document.querySelector('#toasts button.small')?.getAttribute('aria-busy')==='true');
+    await tab.waitForFunction(()=>!document.querySelector('#toasts button.small')?.disabled);
     assert.equal(await tab.$eval('#profile-tab',node=>!!node).catch(()=>false),false);
     assert.equal(await tab.$eval('#browse-vault',node=>!!node).catch(()=>false),false);
     assert.equal(await tab.$eval('#entries',node=>node.textContent.includes('must-not-win')),false);
