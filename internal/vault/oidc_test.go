@@ -20,6 +20,7 @@ type oidcFixture struct {
 	mu                 sync.Mutex
 	base               kvFixture
 	nonce              string
+	role               string
 	root               bool
 	badURL             bool
 	unauthorizedHeader bool
@@ -37,7 +38,8 @@ func (f *oidcFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.unauthorizedHeader = f.unauthorizedHeader || r.Header.Get("X-Vault-Token") != ""
 		var data map[string]string
 		json.NewDecoder(r.Body).Decode(&data)
-		if data["redirect_uri"] != oidcCallback || data["role"] != "oidc" || len(data["client_nonce"]) != 64 {
+		f.role = data["role"]
+		if data["redirect_uri"] != oidcCallback || data["role"] != "jdoe" || len(data["client_nonce"]) != 64 {
 			w.WriteHeader(400)
 			return
 		}
@@ -105,6 +107,7 @@ func (f *oidcFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func oidcClient(t *testing.T) (*oidcFixture, *Client, *string) {
 	t.Helper()
+	t.Setenv("VAUTH_USER_LOGIN", "jdoe")
 	f := &oidcFixture{}
 	c := testClient(t, f)
 	address := ""
@@ -133,6 +136,67 @@ func callback(t *testing.T, address, state string) int {
 	}
 	defer res.Body.Close()
 	return res.StatusCode
+}
+
+func TestSSORoleUsesUsernameSnapshot(t *testing.T) {
+	for _, username := range []string{"jdoe", "JDoe"} {
+		t.Run(username, func(t *testing.T) {
+			f, c, address := oidcClient(t)
+			newClient := c.New
+			c.New = func() (*vauthlogin.Vauth, error) {
+				v, err := newClient()
+				if err == nil {
+					v.Environ["VAUTH_USER_LOGIN"] = username
+				}
+				return v, err
+			}
+			// The snapshot, not a fresh process-environment lookup, supplies the role.
+			t.Setenv("VAUTH_USER_LOGIN", "other-user")
+			if _, err := c.LoginSSO(func(string) error {
+				callback(t, *address, "test-state")
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if f.role != "jdoe" {
+				t.Fatalf("submitted role = %q, want jdoe", f.role)
+			}
+		})
+	}
+}
+
+func TestSSOMissingUsernameHasNoFallback(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		environ map[string]string
+	}{
+		{"nil snapshot", nil},
+		{"missing username", map[string]string{}},
+		{"empty username", map[string]string{"VAUTH_USER_LOGIN": ""}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("VAUTH_USER_LOGIN", "other-user")
+			c := &Client{
+				New: func() (*vauthlogin.Vauth, error) {
+					return &vauthlogin.Vauth{Environ: tc.environ}, nil
+				},
+				listenOIDC: func() (net.Listener, error) {
+					t.Error("missing username started OIDC listener")
+					return nil, errors.New("must not be called")
+				},
+			}
+			session, err := c.LoginSSO(func(string) error {
+				t.Error("missing username opened browser")
+				return nil
+			})
+			if err == nil || !strings.Contains(err.Error(), "VAUTH_USER_LOGIN is required") {
+				t.Fatalf("missing username error = %v", err)
+			}
+			if session != nil || c.pending != nil || c.vauth != nil || c.token != "" {
+				t.Fatal("missing username left SSO state")
+			}
+		})
+	}
 }
 
 func TestSSONoCacheAndFirstEnrollment(t *testing.T) {

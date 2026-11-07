@@ -22,6 +22,12 @@ wherever you like and run it. One signed file, nothing to install.
 If your SSH key is not enrolled yet, use **Login with SSO** and publish a public
 key from **SSH Keys**. SSO needs the configured Vault/Entra callback and keeps
 its Vault token only in memory; it does not populate the CLI token cache.
+No SSH login or enrolled key is required for SSO. Both modes use roles named
+by the bare username, lowercased: OIDC reads `VAUTH_USER_LOGIN` from the same
+client environment snapshot used by the SSH role macro. At app initialization,
+an unset or empty `VAUTH_USER_LOGIN` defaults to the OS account name (without
+the Windows domain prefix). If the client snapshot still lacks a username,
+SSO fails with `VAUTH_USER_LOGIN is required`; it does not use a shared role.
 
 ## What you can do
 

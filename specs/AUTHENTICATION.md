@@ -22,7 +22,18 @@ does not extend to unrelated infrastructure, broadened policies or a release.
 Entra; it is not an offline credential or a replacement for enrolling an agent
 key. Resolve the Vault address/trust from the existing `.vauthrc`; never ship
 an Entra client secret or perform a direct desktop-to-Entra token exchange.
-The initial deployment reuses the existing Vault `oidc` mount and `oidc` role.
+SSO uses the existing Vault `oidc` mount with a role named by the bare username,
+lowercased consistently with SSH. OIDC reads `VAUTH_USER_LOGIN` from the fresh
+vauth-login client's public `Environ` snapshot, the same snapshot used by
+`ssh_auth.role: $${env.VAUTH_USER_LOGIN}`; it does not resolve the raw `.vauthrc`
+again or require an SSH login to obtain the username.
+
+At app initialization, `defaultLogin` preserves a nonempty `VAUTH_USER_LOGIN`.
+Otherwise it uses the OS account name, strips a Windows domain prefix and
+lowercases the result before clients are built. If the client snapshot still
+has no username, SSO returns the existing SSO failure error with
+`VAUTH_USER_LOGIN is required` before starting the listener or requesting an
+authorization URL. It does not guess another identity or use a shared role.
 
 ## Callback and challenge
 
@@ -35,7 +46,8 @@ role. It is not an Identity-hosted callback or a new public HTTPS service.
    the browser. Serve only `/oidc/callback`; bind failure is an explicit error,
    not a switch to an arbitrary unregistered port or a public interface.
 2. Go POSTs to `auth/oidc/oidc/auth_url`, without a Vault credential, with
-   `role: oidc`, the exact `redirect_uri` and the fresh `client_nonce`.
+   the lowercased username as `role`, the exact `redirect_uri` and the fresh
+   `client_nonce`.
 3. Validate the returned authorization URL against the configured/trusted
    Entra issuer, retain its state in Go and open it in the system browser.
    No authorization URL containing a Vault token is produced.

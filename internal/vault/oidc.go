@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,6 +150,15 @@ func (c *Client) LoginSSO(open func(string) error) (*Session, error) {
 		}
 		c.mu.Unlock()
 	}()
+	v, err := c.New()
+	if err != nil {
+		return nil, i18n.Errorf("err.sso.failed")
+	}
+	// Reuse the same environment snapshot and lowercase normalization as SSH.
+	role := strings.ToLower(v.Environ["VAUTH_USER_LOGIN"])
+	if role == "" {
+		return nil, fmt.Errorf("%w: VAUTH_USER_LOGIN is required", i18n.Errorf("err.sso.failed"))
+	}
 	listen := c.listenOIDC
 	if listen == nil {
 		listen = func() (net.Listener, error) { return net.Listen("tcp4", "127.0.0.1:8250") }
@@ -157,10 +168,6 @@ func (c *Client) LoginSSO(open func(string) error) (*Session, error) {
 		return nil, i18n.Errorf("err.sso.port")
 	}
 	defer listener.Close()
-	v, err := c.New()
-	if err != nil {
-		return nil, i18n.Errorf("err.sso.failed")
-	}
 	v.TokenCache = false
 	v.Stderr = io.Discard
 	original := v.HTTPClient
@@ -191,7 +198,7 @@ func (c *Client) LoginSSO(open func(string) error) (*Session, error) {
 		return nil, i18n.Errorf("err.sso.failed")
 	}
 	nonce := hex.EncodeToString(random[:])
-	challenge, err := request("POST", "auth/oidc/oidc/auth_url", map[string]any{"role": "oidc", "redirect_uri": oidcCallback, "client_nonce": nonce})
+	challenge, err := request("POST", "auth/oidc/oidc/auth_url", map[string]any{"role": role, "redirect_uri": oidcCallback, "client_nonce": nonce})
 	if err != nil {
 		return nil, err
 	}
