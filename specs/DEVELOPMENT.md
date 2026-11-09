@@ -4,7 +4,35 @@ Read [dev_guideline.md](dev_guideline.md): boring is good.
 
 ## Build and tests
 
-Go 1.26 and Wails v3.1 are pinned in `go.mod`. Windows builds do not need cgo:
+Go 1.26 and Wails v3.1 are pinned in `go.mod`. Node 22.22.2 and the npm lock
+build the shared Svelte UI with esbuild. `package.json` pins the shared source
+from a `vauth-ui` GitHub release archive; `package-lock.json` pins its integrity.
+A clean build needs no sibling checkout or library development toolchain.
+Before Go tests or a release:
+
+```sh
+npm ci
+npm run test:build
+npm run build
+npm run check:build
+```
+
+`src/App.svelte` supplies desktop SSH/SSO login, settings/update and caption
+snippets to `vauth-ui`. Its shared screens mount directly into the body before
+`ui/app.js` attaches once; the controller owns populated lists and hidden states.
+Language changes retain the existing full-document reload. `src/desktop.css`
+contains native selection/font/caption overrides; component-scoped CSS is emitted
+into the external build stylesheet, never injected by Svelte at runtime.
+
+The tracked `ui/generated/app.js` and `app.css` keep Go-only builds usable.
+`ui.Page` embeds both into a standalone inline document with the original CSP,
+no network modules, CDN or asset requests. CI verifies a deterministic rebuild
+before Go tests and release. `ui/FRONTEND-NOTICE.txt` preserves the frontend
+ISC/MIT attributions as a safe comment in the generated JS and standalone page.
+The fixture checks scoped component style emission,
+and the build rejects duplicate Svelte runtimes, including local development.
+
+Windows builds do not need cgo:
 
 ```sh
 gofmt -l .
@@ -28,7 +56,7 @@ and optional `WindowSession`. Close destroys that window/browser, not the
 Vault session or tray. Quit closes the resident client and its OIDC listener.
 The native Minimize control/event hides the existing session.
 
-The UI is inline HTML/CSS/JS, without generated bindings or a frontend build.
+The built Svelte UI is embedded as inline HTML/CSS/JS, without generated Wails bindings.
 It waits for `wails:runtime-config-ready`, posts raw `{id,page,method,args}`
 messages, and receives `{id,page,error,expired,result}` through `vauthDone`.
 Only the resident runtime's current window can enter the bridge; the page CSP
@@ -50,7 +78,7 @@ this explicitly as a warning, not a clean exit.
 | --- | --- |
 | `app.go`, `main.go` | Backend API and shared bootstrap |
 | `runtime.go`, `window_session.go` | Resident ownership and disposable page-aware bridge |
-| `ui/` | Embedded workspace, translations, custom frame and native RPC |
+| `src/`, `ui/` | Shared Svelte composition, generated inline assets and native RPC |
 | `internal/vault` | Existing vauth-login, SSO, KV, wrapping and expiry policies |
 | `internal/tray` | Native icon and Open/Quit menu |
 | `internal/clipboard` | Windows private clipboard and platform fallback |
@@ -98,6 +126,7 @@ go run github.com/tc-hib/go-winres@v0.3.3 make --arch amd64
 With Puppeteer available in the development module search path:
 
 ```sh
+npm run build
 node ui/browser_test.cjs
 ```
 

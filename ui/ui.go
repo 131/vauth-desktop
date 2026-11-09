@@ -1,6 +1,5 @@
-// Package ui holds the window document: index.html with style.css and app.js.
-// {{key}} placeholders of index.html are replaced by the i18n messages, which
-// app.js also receives as window.I18N.
+// Package ui embeds the built Svelte document and its native controller.
+// Go supplies the language catalog before the shared UI mounts.
 package ui
 
 import (
@@ -15,7 +14,7 @@ import (
 
 var placeholder = regexp.MustCompile(`\{\{([a-z0-9.]+)\}\}`)
 
-//go:embed index.html style.css app.js
+//go:embed index.html generated/app.css generated/app.js
 var assets embed.FS
 
 // Page returns the UI as a single document in language, with style and
@@ -33,7 +32,7 @@ func Page(language string) string {
 		return html.EscapeString(messages[match[2:len(match)-2]])
 	})
 	state, _ := json.Marshal(map[string]any{"language": i18n.Normalize(language), "languages": i18n.Languages, "messages": messages})
-	page = strings.Replace(page, `<link rel="stylesheet" href="style.css">`, "<style>"+read("style.css")+"</style>", 1)
-	page = strings.Replace(page, `<script src="app.js"></script>`, "<script>window.I18N="+string(state)+";</script><script>"+read("app.js")+"</script>", 1)
+	page = strings.Replace(page, `<link rel="stylesheet" href="generated/app.css">`, "<style>"+read("generated/app.css")+"</style>", 1)
+	page = strings.Replace(page, `<script src="generated/app.js"></script>`, "<script>window.I18N="+string(state)+";</script><script>"+read("generated/app.js")+"</script>", 1)
 	return page
 }

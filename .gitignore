@@ -1,3 +1,5 @@
 /dist
 *.exe
 /.gh-actions
+
+/node_modules

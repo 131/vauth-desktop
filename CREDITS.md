@@ -6,6 +6,9 @@
   [ssh-agent-crypt](https://github.com/131/ssh-agent-crypt): Vault login and
   token cache
 - [Wails v3](https://github.com/wailsapp/wails) (MIT): window, tray, single instance and updater
+- `vauth-ui` (ISC): shared personal Vault workspace screens
+- Svelte and esbuild (MIT): UI compilation and bundling
+- [Frontend notices](ui/FRONTEND-NOTICE.txt) accompany the embedded bundle
 - Icon: original padlock, drawn by `winres/icon.py`
 - Code signing, courtesy of Essilor International
 

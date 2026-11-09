@@ -1,0 +1,24 @@
+{
+  "name": "vauth-desktop",
+  "version": "2.3.5",
+  "private": true,
+  "description": "Native personal Vault workspace",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:131/vauth-desktop.git"
+  },
+  "scripts": {
+    "build": "node scripts/build-ui.mjs",
+    "check:build": "node scripts/build-ui.mjs --check",
+    "test:browser": "node ui/browser_test.cjs",
+    "version": "node scripts/version-lock.cjs",
+    "test:build": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "svelte": "5.57.3",
+    "vauth-ui": "https://github.com/131/vauth-ui/releases/download/v0.1.1/vauth-ui-0.1.1.tgz"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

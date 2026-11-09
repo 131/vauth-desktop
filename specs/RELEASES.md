@@ -3,7 +3,11 @@
 ## Publishing a release
 
 From a clean `master`, [ppackage](https://github.com/131/ppackage) aligns root
-version markers and creates the version commit/lightweight tag:
+version markers and creates the version commit/lightweight tag. The package
+`version` hook uses ppackage's target `npm_package_version` to align and stage
+both lockfile root versions before the root package marker is rewritten. UI
+assets do not bake the package version; the native version RPC supplies it.
+Verify `npm ci && npm run test:build && npm run check:build` before publication:
 
 ```sh
 ppackage version patch   # or minor, major, X.Y.Z, X.Y.Z-beta.N

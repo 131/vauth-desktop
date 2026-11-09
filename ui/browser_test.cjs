@@ -11,7 +11,7 @@ const escape = text => text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>
 function page(language, offline = false) {
   const catalog = messages[language];
   let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace(/\{\{([^}]+)\}\}/g, (_, key) => escape(catalog[key]));
-  html = html.replace('<link rel="stylesheet" href="style.css">', '<style>' + fs.readFileSync(path.join(__dirname, 'style.css'), 'utf8') + '</style>');
+  html = html.replace('<link rel="stylesheet" href="generated/app.css">', '<style>' + fs.readFileSync(path.join(__dirname, 'generated/app.css'), 'utf8') + '</style>');
   const mock = `
   window.I18N = ${JSON.stringify({language, languages: Object.keys(messages), messages: catalog})};
   // Older development Chromium lacks popovers; only the notification host is shimmed.
@@ -23,6 +23,10 @@ function page(language, offline = false) {
   }
   window.testState = {session:null, readError:false, conflict:false, version:1, trace:[], documents:{}, expires:false,sshError:${offline}};
   const user = {login:'jdoe',vault_addr:'https://vault.example.test',profile:{VAUTH_USER_LOGIN:'jdoe',VAUTH_USER_NAME:'John Doe',VAUTH_USER_MAIL:'jdoe@example.test',CUSTOM_ID:'profile'},fixed_vars:['VAUTH_USER_LOGIN','VAUTH_USER_NAME','VAUTH_USER_MAIL'],auth_mode:'ssh'};
+  const agentKeys = [
+    {key:'ssh-ed25519 synthetic-authorized current-key',comment:'Current synthetic key',fingerprint:'SHA256:synthetic-authorized'},
+    {key:'ssh-ed25519 synthetic-alternative alternate-key',comment:'Alternate synthetic key',fingerprint:'SHA256:synthetic-alternative'},
+  ];
   const typed = {text:'synthetic-hidden-value',flag:true,number:2,array:[1,null],nested:{ok:false}};
   window._wails = {invoke: message => {
     if (message.startsWith('wails:non-client-region:')) { window.testCaptionRegions = JSON.parse(message.slice('wails:non-client-region:'.length)); return; }
@@ -43,8 +47,8 @@ function page(language, offline = false) {
         case 'write': return respond(null);
         case 'wrap': if(state.wrapError) return respond(null,'Wrap denied'); return respond('synthetic-wrapping-token');
         case 'unwrap': if(state.unwrapError) return respond(null,'Invalid or consumed token'); if(state.unwrapSlow) return setTimeout(()=>respond('late message'),160); return respond('synthetic-unwrapped-text');
-        case 'agent_keys': return respond([]);
-        case 'ssh_read': return respond([]);
+        case 'agent_keys': return respond(agentKeys);
+        case 'ssh_read': return respond([agentKeys[0].key]);
         case 'ssh_publish': return respond(null);
         case 'kv_mounts': return respond([{path:'secrets/',version:2},{path:'legacy/',version:1}]);
         case 'kv_list': return respond({keys:args[1]?['new','slow']:['folder/','typed','denied']});
@@ -63,7 +67,7 @@ function page(language, offline = false) {
     },0);
   }};
   `;
-  return html.replace('<script src="app.js"></script>', '<script>'+mock+'</script><script>'+fs.readFileSync(path.join(__dirname,'app.js'),'utf8')+'</script>');
+  return html.replace('<script src="generated/app.js"></script>', '<script>'+mock+'</script><script>'+fs.readFileSync(path.join(__dirname,'generated/app.js'),'utf8')+'</script>');
 }
 
 (async () => {
@@ -73,13 +77,45 @@ function page(language, offline = false) {
   try {
     browser = await puppeteer.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
     const tab = await browser.newPage(); await tab.setViewport({width:920,height:600});
-    const errors=[]; tab.on('pageerror',error=>errors.push(error.message));
+    const externalRequests=[]; tab.on('request', request => { if (!request.url().startsWith('http://127.0.0.1:')) externalRequests.push(request.url()); });
+    const errors=[]; tab.on('pageerror',error=>{errors.push(error.message); if(process.env.UI_DEBUG) console.error(error.message)});
     const click = selector => tab.$eval(selector, node => node.click());
     await tab.goto('http://127.0.0.1:'+server.address().port+'/en');
     if(process.env.UI_DEBUG) console.log('Initial UI',await tab.evaluate(()=>['connect','login','workspace','toasts'].map(id=>{const n=document.getElementById(id),r=n.getBoundingClientRect();return {id,display:getComputedStyle(n).display,rect:[r.x,r.y,r.width,r.height]}})),errors);
     await tab.waitForSelector('#workspace:not([hidden])');
+    assert.equal(await tab.$eval('#connect', node=>node.textContent.trim()), messages['en-us'].connect + ' ↗');
+    assert.equal(await tab.evaluate(() => { const ids = [...document.querySelectorAll('[id]')].map(node=>node.id); return new Set(ids).size === ids.length; }), true, 'Shared and native snippet IDs are unique');
     await tab.waitForFunction(() => document.querySelectorAll('#entries .entry').length===5);
     assert.equal(await tab.$eval('#count',node=>node.textContent),'5');
+    // Native agent list: authorized and alternate keys retain the desktop row layout.
+    await click('#ssh-tab');
+    await tab.waitForFunction(() => document.querySelectorAll('#agent-keys .agent-key').length === 2);
+    const agentLayout = await tab.evaluate(() => {
+      const list = document.getElementById('agent-keys');
+      const row = list.querySelector('.agent-key.current');
+      const style = getComputedStyle(row);
+      const children = [...row.children].map(node => node.getBoundingClientRect());
+      return {
+        border: getComputedStyle(list).borderTopWidth,
+        surface: getComputedStyle(list).backgroundColor,
+        current: style.backgroundColor,
+        columns: style.gridTemplateColumns.split(' ').map(parseFloat),
+        actions: getComputedStyle(row.querySelector('.actions')).justifyContent,
+        ordered: children[0].right <= children[1].left && children[1].right <= children[2].left,
+        contained: children[2].right <= list.getBoundingClientRect().right,
+      };
+    });
+    assert.equal(agentLayout.border, '1px', 'Native agent list has its border');
+    assert.equal(agentLayout.surface, 'rgb(255, 255, 255)', 'Native agent list has its surface');
+    assert.equal(agentLayout.current, 'rgb(240, 246, 238)', 'Authorized agent row is highlighted');
+    assert.equal(agentLayout.columns.length, 3, 'Name, fingerprint and actions use separate columns');
+    assert.equal(agentLayout.columns[2], 180, 'Native agent actions retain their reserved width');
+    assert.equal(agentLayout.actions, 'flex-end');
+    assert.equal(agentLayout.ordered && agentLayout.contained, true, 'Agent row columns do not overlap or overflow');
+    assert.equal(await tab.$eval('#agent-keys .current .badge', node => node.textContent), messages['en-us'].authorized);
+    await click('#agent-keys .agent-key:not(.current) .actions button');
+    assert.equal(await tab.$eval('#ssh-key', node => node.value), 'ssh-ed25519 synthetic-alternative alternate-key');
+    await click('#secrets-tab');
     // Notifications stay in the modal host and retain the same action on error.
     await click('#settings-button'); await tab.evaluate(()=>window.testState.available=true); await click('#check-update');
     await tab.waitForSelector('#settings #toasts .toast button.small');
@@ -161,8 +197,8 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#unwrap-data',n=>n.tagName),'TEXTAREA');
     assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),"Wrap your secret into a one-time-token");
     assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),"Unwrap your one-time-token");
-    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Your one-time-token');
-    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Token to open');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent.trim()),'Your one-time-token');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent.trim()),'Token to open');
     assert.equal(await tab.evaluate(()=>document.getElementById('wrap-ttl').getBoundingClientRect().bottom < document.getElementById('wrap-data').getBoundingClientRect().top),true,'TTL precedes the textarea');
     assert.equal(await tab.$eval('#wrap-submit',n=>n.getBoundingClientRect().height<=32),true,'Classic button height');
     const editorBefore=await tab.$eval('#wrap-data',n=>({width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height}));
@@ -241,8 +277,8 @@ function page(language, offline = false) {
     assert.equal(await tab.$eval('#unwrap-tab',n=>n.textContent),'Ouvrir (unwrap) un secret');
     assert.equal(await tab.$eval('#wrap-submit',n=>n.textContent),'Créer (wrap) un token à usage unique pour votre secret');
     assert.equal(await tab.$eval('#unwrap-submit',n=>n.textContent),'Ouvrir (unwrap) votre token à usage unique');
-    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent),'Votre token à usage unique');
-    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent),'Token à ouvrir');
+    assert.equal(await tab.$eval('#wrap-token',n=>n.closest('label').textContent.trim()),'Votre token à usage unique');
+    assert.equal(await tab.$eval('#unwrap-token',n=>n.closest('label').textContent.trim()),'Token à ouvrir');
     await click('#wrap-tab');
     await tab.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{}}})});
     await tab.type('#wrap-data','Un secret synthétique'); await click('#wrap-submit');
@@ -309,7 +345,8 @@ function page(language, offline = false) {
     assert.equal(regions.version,1);
     assert.deepEqual(regions.regions.map(r=>r.kind),['caption','caption','minimize','maximize','close']);
     assert.ok(regions.regions.every(r=>r.right>r.left&&r.bottom>r.top),'Physical native caption rectangles');
+    assert.deepEqual(externalRequests, [], 'Standalone built document makes no external asset requests');
     assert.deepEqual(errors,[],'Browser script errors');
-    console.log('Browser UI: merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');
+    console.log('Browser UI: native agent row styling/selection, merged rows/search, KV masking, typed CAS/drafts, exact-path ACLs, stale responses first enrollment, copied key names and simple message wrapping OK');
   } finally {if(browser) await browser.close();await new Promise(resolve=>server.close(resolve))}
 })().catch(error=>{console.error(error);process.exitCode=1});

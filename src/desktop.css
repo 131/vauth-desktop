@@ -1,0 +1,21 @@
+/* Native typography/selection and toast clearance below Windows caption hit testing. */
+:root{font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;font-size:12.5px;--vauth-toast-top:42px}
+body{user-select:none;-webkit-user-select:none;cursor:default}
+input,textarea,.secret,#account,#vault-addr{user-select:text;-webkit-user-select:text}
+/* Native agent rows extend the common entry styling. */
+#agent-keys{border:1px solid var(--line);background:#fff}
+.agent-key.current{background:#f0f6ee}
+.entry.agent-key{grid-template-columns:minmax(140px,1fr) minmax(160px,380px) 180px}
+.agent-key .actions{justify-content:flex-end}
+/* Hybrid caption: Wails reports these regions to native Windows hit testing.
+   Border/rounded corners/shadow and edge resizing are not drawn in CSS. */
+header{height:34px;flex:none;padding:0 0 0 12px;gap:6px}
+.brand,.caption-drag{--wails-non-client-region:caption}
+.caption-drag{flex:1;align-self:stretch;min-width:12px}
+.caption-buttons{display:flex;align-self:stretch;margin-left:4px}
+.caption-buttons button{width:36px;padding:0;background:transparent;color:#4c5c51;border:0;border-radius:0;font-size:16px;font-weight:400}
+.caption-buttons button:hover{background:#e7eee4}
+#caption-minimize{--wails-non-client-region:minimize}
+#caption-maximize{--wails-non-client-region:maximize}
+#caption-close{--wails-non-client-region:close}
+#caption-close:hover{background:#c42b1c;color:#fff}

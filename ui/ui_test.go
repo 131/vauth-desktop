@@ -13,20 +13,52 @@ import (
 
 func TestPage(t *testing.T) {
 	page := Page("fr-fr")
-	if strings.Contains(page, `href="style.css"`) || strings.Contains(page, `src="app.js"`) || !strings.Contains(page, "window.vauthDone") {
+	if strings.Contains(page, `href="generated/app.css"`) || strings.Contains(page, `src="generated/app.js"`) || !strings.Contains(page, "window.vauthDone") {
 		t.Fatal("assets not inlined")
 	}
-	if !strings.Contains(page, `<html lang="fr">`) || !strings.Contains(page, "Se connecter avec mon agent SSH") {
+	if !strings.Contains(page, `default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'`) {
+		t.Fatal("native document CSP changed")
+	}
+	if regexp.MustCompile(`<script[^>]+src=|<link[^>]+rel="stylesheet"`).MatchString(page) {
+		t.Fatal("standalone document references external assets")
+	}
+	if !strings.Contains(page, `<html lang="fr">`) || !strings.Contains(page, `"connect":"Se connecter avec mon agent SSH"`) {
 		t.Fatal("french page")
 	}
 }
 
-func TestEveryPlaceholderTranslated(t *testing.T) {
-	html, _ := assets.ReadFile("index.html")
+func TestFrontendNoticeEmbedded(t *testing.T) {
+	notice, err := os.ReadFile("FRONTEND-NOTICE.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notice) == 0 || bytes.Contains(notice, []byte("*/")) || bytes.Contains(bytes.ToLower(notice), []byte("</script")) {
+		t.Fatal("frontend notice is empty or unsafe as an inline script comment")
+	}
+	bundle, err := assets.ReadFile("generated/app.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	comment := "/*!\n" + string(notice) + "*/"
+	if !strings.HasPrefix(string(bundle), comment) {
+		t.Fatal("compiled frontend bundle must carry the complete notice")
+	}
 	for _, language := range i18n.Languages {
-		for _, match := range regexp.MustCompile(`\{\{([^}]+)\}\}`).FindAllStringSubmatch(string(html), -1) {
+		if !strings.Contains(Page(language), comment) {
+			t.Fatalf("%s: standalone document lacks frontend notices", language)
+		}
+	}
+}
+
+func TestEverySnippetKeyTranslated(t *testing.T) {
+	source, err := os.ReadFile("../src/App.svelte")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, language := range i18n.Languages {
+		for _, match := range regexp.MustCompile(`\bt\('([^']+)'`).FindAllStringSubmatch(string(source), -1) {
 			if _, ok := i18n.Messages(language)[match[1]]; !ok {
-				t.Errorf("%s missing placeholder %s", language, match[1])
+				t.Errorf("%s missing snippet key %s", language, match[1])
 			}
 		}
 		page := Page(language)
@@ -34,7 +66,7 @@ func TestEveryPlaceholderTranslated(t *testing.T) {
 			t.Fatalf("%s: %s left", language, leftover)
 		}
 	}
-	if page := Page("en-us"); !strings.Contains(page, `<html lang="en">`) || !strings.Contains(page, "Sign in with my SSH agent") || !strings.Contains(page, `"language":"en-us"`) {
+	if page := Page("en-us"); !strings.Contains(page, `<html lang="en">`) || !strings.Contains(page, `"connect":"Sign in with my SSH agent"`) || !strings.Contains(page, `"language":"en-us"`) {
 		t.Fatal("english page")
 	}
 }
@@ -47,7 +79,8 @@ func TestNeutralProjectContents(t *testing.T) {
 			return err
 		}
 		if entry.IsDir() {
-			if entry.Name() == ".git" {
+			// Dependencies and Git metadata are not maintained project source.
+			if entry.Name() == ".git" || entry.Name() == "node_modules" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -70,7 +103,7 @@ func TestNeutralProjectContents(t *testing.T) {
 
 func TestEveryScriptKeyExists(t *testing.T) {
 	page := Page("en-us")
-	script, _ := assets.ReadFile("app.js")
+	script, _ := os.ReadFile("app.js")
 	for _, match := range regexp.MustCompile(`\bt\('([^']+)'`).FindAllStringSubmatch(string(script), -1) {
 		if !strings.Contains(page, `"`+match[1]+`":`) {
 			t.Errorf("app.js uses unknown message %s", match[1])
