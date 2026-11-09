@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "version": "v2.3.5",
-  "publishedAt": "2026-11-07T20:42:19Z",
+  "version": "v2.4.0",
+  "publishedAt": "2026-11-09T17:38:15Z",
   "artifacts": [
     {
-      "url": "https://github.com/131/vauth-desktop/releases/download/v2.3.5/vauth-desktop-windows-amd64.exe",
+      "url": "https://github.com/131/vauth-desktop/releases/download/v2.4.0/vauth-desktop-windows-amd64.exe",
       "platform": "windows",
       "arch": "amd64",
-      "size": 13994104,
+      "size": 14065272,
       "digestAlgo": "sha512",
-      "digest": "IIkpaeNrGRaRjy9h1vRaw8aGZGoyqsOUGz9VjLqyjXcQJX6K4ftpNGyFKhdW2xcYQgP309Gx1ANTIh8K+Vv/NQ=="
+      "digest": "mEQG16Pr9BIDJNaZdcN/7yem/vIkCJr492jphG2T/Pg1jIBJjZTCJVHvURnvXszp2PSYSecA+2E8qIDgt52gIw=="
     }
   ]
 }
