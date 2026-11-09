@@ -1,0 +1,66 @@
+{
+  "source": "https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md",
+  "description": "Offline regression test data derived from the original desktop terminology table. The shared source is normative; this golden fixture is not a second specification.",
+  "terms": [
+    {
+      "key": "tab.wrap",
+      "en-us": "Send (wrap) a secret",
+      "fr-fr": "Envoyer (wrap) un secret",
+      "zh-cn": "发送 (wrap) 机密"
+    },
+    {
+      "key": "tab.unwrap",
+      "en-us": "Open (unwrap) a secret",
+      "fr-fr": "Ouvrir (unwrap) un secret",
+      "zh-cn": "打开 (unwrap) 机密"
+    },
+    {
+      "key": "wrap.submit",
+      "en-us": "Wrap your secret into a one-time-token",
+      "fr-fr": "Créer (wrap) un token à usage unique pour votre secret",
+      "zh-cn": "为您的机密创建 (wrap) 一次性 token"
+    },
+    {
+      "key": "wrap.unwrap",
+      "en-us": "Unwrap your one-time-token",
+      "fr-fr": "Ouvrir (unwrap) votre token à usage unique",
+      "zh-cn": "打开 (unwrap) 您的一次性 token"
+    },
+    {
+      "key": "wrap.token",
+      "en-us": "Your one-time-token",
+      "fr-fr": "Votre token à usage unique",
+      "zh-cn": "您的一次性 token"
+    },
+    {
+      "key": "unwrap.token",
+      "en-us": "Token to open",
+      "fr-fr": "Token à ouvrir",
+      "zh-cn": "要打开的 token"
+    },
+    {
+      "key": "wrap.data",
+      "en-us": "Your secret",
+      "fr-fr": "Votre secret",
+      "zh-cn": "您的机密"
+    },
+    {
+      "key": "wrap.result",
+      "en-us": "The secret",
+      "fr-fr": "Le secret",
+      "zh-cn": "机密内容"
+    },
+    {
+      "key": "wrap.ttl",
+      "en-us": "Valid for",
+      "fr-fr": "Durée de validité",
+      "zh-cn": "有效期"
+    },
+    {
+      "key": "wrap.copy.data",
+      "en-us": "Copy secret",
+      "fr-fr": "Copier le secret",
+      "zh-cn": "复制机密"
+    }
+  ]
+}

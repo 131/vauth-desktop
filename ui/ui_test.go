@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -112,13 +113,36 @@ func TestEveryScriptKeyExists(t *testing.T) {
 }
 
 func TestTokenWrapLanguageAndTerminology(t *testing.T) {
-	data, err := os.ReadFile("../specs/TOKEN_WRAP.md")
+	// Offline regression data, not a second normative terminology specification.
+	data, err := os.ReadFile("testdata/token-wrap-terms.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden struct {
+		Source string `json:"source"`
+		Terms  []struct {
+			Key     string `json:"key"`
+			English string `json:"en-us"`
+			French  string `json:"fr-fr"`
+			Chinese string `json:"zh-cn"`
+		} `json:"terms"`
+	}
+	if err := json.Unmarshal(data, &golden); err != nil {
+		t.Fatal(err)
+	}
+	if golden.Source != "https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md" {
+		t.Fatal("golden fixture must identify the canonical shared source")
+	}
+	data, err = os.ReadFile("../specs/TOKEN_WRAP.md")
 	if err != nil {
 		t.Fatal(err)
 	}
 	spec := string(data)
-	if !strings.Contains(spec, "## Language & terminology") {
-		t.Fatal("terminology section missing")
+	if !strings.Contains(spec, "LOCAL specialization") || !strings.Contains(spec, "]("+golden.Source+")") {
+		t.Error("local specialization must link the canonical shared spec")
+	}
+	if !strings.Contains(spec, "](../ui/testdata/token-wrap-terms.json)") || !strings.Contains(spec, "not a second normative specification") {
+		t.Error("local doc must identify the fixture as non-normative test data")
 	}
 	english, french, chinese := i18n.Messages("en-us"), i18n.Messages("fr-fr"), i18n.Messages("zh-cn")
 	for key, value := range french {
@@ -126,12 +150,31 @@ func TestTokenWrapLanguageAndTerminology(t *testing.T) {
 			t.Errorf("%s: fr-fr must retain the term token", key)
 		}
 	}
-	for _, key := range []string{"tab.wrap", "tab.unwrap", "wrap.submit", "wrap.unwrap", "wrap.token", "unwrap.token", "wrap.data", "wrap.result", "wrap.ttl", "wrap.copy.data"} {
+	keys := []string{"tab.wrap", "tab.unwrap", "wrap.submit", "wrap.unwrap", "wrap.token", "unwrap.token", "wrap.data", "wrap.result", "wrap.ttl", "wrap.copy.data"}
+	if len(golden.Terms) != len(keys) {
+		t.Fatalf("golden fixture has %d rows, want %d", len(golden.Terms), len(keys))
+	}
+	for index, key := range keys {
+		term := golden.Terms[index]
+		if term.Key != key {
+			t.Fatalf("golden row %d: key %q, want %q", index, term.Key, key)
+		}
+		for _, translation := range []struct {
+			Language string
+			Catalog  map[string]string
+			Expected string
+		}{
+			{"en-us", english, term.English},
+			{"fr-fr", french, term.French},
+			{"zh-cn", chinese, term.Chinese},
+		} {
+			actual, ok := translation.Catalog[key]
+			if !ok || translation.Expected == "" || actual != translation.Expected {
+				t.Errorf("%s %s: catalog %q, want golden %q", key, translation.Language, actual, translation.Expected)
+			}
+		}
 		if english[key] == french[key] {
 			t.Errorf("%s: French still uses English wording", key)
-		}
-		if !strings.Contains(spec, "| "+english[key]+" | "+french[key]+" | "+chinese[key]+" |") {
-			t.Errorf("%s: terminology table and catalog differ", key)
 		}
 	}
 }

@@ -83,10 +83,14 @@ only kept in memory while the app runs.
 
 ## Specifications
 
-[Settings](specs/SETTINGS.md), [releases and auto-update](specs/RELEASES.md),
-[Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md), [tray/window](specs/TRAY.md).
+The shared UI owns the canonical [Vault UX](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md)
+and [one-time secret sharing](https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md)
+contracts. The documents below retain desktop-specific responsibilities.
 
-[Wrapping](specs/TOKEN_WRAP.md), [workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
+[Settings](specs/SETTINGS.md), [releases and auto-update](specs/RELEASES.md),
+[Native Vault access](specs/VAULT.md), [development](specs/DEVELOPMENT.md), [tray/window](specs/TRAY.md).
+
+[Native wrapping](specs/TOKEN_WRAP.md), [native workspace](specs/WORKSPACE.md), [authentication and first enrollment](specs/AUTHENTICATION.md).
 Version 2.0.0 introduces the workspace and SSO enrollment flow.
 Live Windows SSO/enrollment validation remains operator-confirmed.
 

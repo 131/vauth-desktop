@@ -4,9 +4,10 @@
 
 Workspace authentication for version 2.0.0.
 **Login with SSO** on the disconnected screen obtains an uncached user
-Vault session and enables initial SSH public-key enrollment. The workspace/KV behavior is in
-[WORKSPACE.md](WORKSPACE.md). The operator explicitly requested targeted callback
-deployment to Entra and Vault Primary after acknowledgement. That authorization
+Vault session and enables initial SSH public-key enrollment. Common workspace/KV
+behavior is defined by [vauth-ui Vault UX](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md);
+native integration is in [WORKSPACE.md](WORKSPACE.md). The operator explicitly
+requested targeted callback deployment to Entra and Vault Primary after acknowledgement. That authorization
 does not extend to unrelated infrastructure, broadened policies or a release.
 
 ## Two authentication modes

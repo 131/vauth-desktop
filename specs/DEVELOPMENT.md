@@ -2,6 +2,12 @@
 
 Read [dev_guideline.md](dev_guideline.md): boring is good.
 
+Functional requirements belong to the shared
+[Vault UX](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md) and
+[one-time secret sharing](https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md)
+specs; [WORKSPACE.md](WORKSPACE.md), [VAULT.md](VAULT.md) and
+[TOKEN_WRAP.md](TOKEN_WRAP.md) describe the native specializations.
+
 ## Build and tests
 
 Go 1.26 and Wails v3.1 are pinned in `go.mod`. Node 22.22.2 and the npm lock
@@ -112,8 +118,14 @@ lock. See [RELEASES.md](RELEASES.md#windows-update-leftovers).
 ## Translations and icon
 
 `internal/i18n/messages.json` holds `fr-fr`, `en-us` and `zh-cn`. Tests compare
-all three catalogs and every UI key. `winres/icon.png` is the shared tray/app
-icon; the Windows icon/manifest are linked through `rsrc_windows_amd64.syso`.
+all three catalogs and every UI key. The non-normative
+[terminology golden fixture](../ui/testdata/token-wrap-terms.json) snapshots the
+ten existing sharing labels in all three languages for offline regression
+checks. Its source URL points to the canonical shared table; check that source
+when deliberately changing the snapshot. The pinned v0.1.1 archive predates
+these shared docs, so tests do not fetch them or assume a sibling checkout.
+
+`winres/icon.png` is the shared tray/app icon; the Windows icon/manifest are linked through `rsrc_windows_amd64.syso`.
 After editing resources:
 
 ```sh

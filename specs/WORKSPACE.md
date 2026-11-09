@@ -1,169 +1,101 @@
-# Workspace tabs
+# Workspace — LOCAL specialization
 
-## Development status
+## Defining sources
 
-This describes the workspace implementation, including ad-hoc response wrapping.
-The desktop uses the approved labels and layout below. Callback configuration
-is deployed and published in both owning systems; see
-[AUTHENTICATION.md](AUTHENTICATION.md). Mock backend and browser tests validate
-behavior without accessing live secrets. Real Windows SSO and user-confirmed
-public-key enrollment remain part of the release acceptance checklist.
+The shared UI owns the functional workspace contract:
+[vauth-ui Vault UX](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md)
+and [one-time secret sharing](https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md).
+Those sources define section order and labels, merged environment data,
+KV discovery/navigation, JSON types, CAS, ACLs, editing and shared state handling.
+This document specializes that contract for the native desktop; it is not a
+second functional spec or translation table.
 
-## Navigation
+## Native shell and navigation
 
-The signed-in workspace has five tabs, in this order:
+The shared workspace navigation and KV folder sidebar stay embedded in the
+disposable WebView. KV browsing/editing does not open a remote Vault UI or
+create a token-bearing browser link. Authentication and release links use the
+system browser through Go-owned actions instead.
 
-1. **Vauth Secured Environnement (venv)**: personal environment variables and
-   Vault identity metadata in one list; selected by default.
-2. **SSH Keys**: agent-key selection and publication, including first enrollment
-   after SSO.
-3. **Secrets browser**: embedded browser/editor for user-accessible KV mounts.
-4. **Send (wrap) a secret**: write a secret and create/copy its single-use token.
-5. **Open (unwrap) a secret**: paste a token and read the original secret directly.
+The native caption and tray determine window lifetime, not the shared shell.
+Initial size is 920×600, minimum size 600×380; native resize, caption actions,
+Open/Close/Minimize/Quit and single-instance behavior are defined in
+[TRAY.md](TRAY.md). Native typography, selection and caption clearance live in
+`src/desktop.css`. Browser zoom/reload shortcuts and non-input context menus
+and file drops are suppressed by `ui/app.js`; text fields retain selection.
+Language changes reload the whole document, as defined in
+[SETTINGS.md](SETTINGS.md): page-only navigation/drafts are lost while the
+resident Go session survives, rather than updating a browser-persisted session.
 
-Both secret-sharing tabs use one compact primary action without JSON input. Wrap offers
-a lifetime dropdown (15 min, 6 h, 72 h); token fields are single-line and the
-recovered secret uses a read-only textarea;
-see [TOKEN_WRAP.md](TOKEN_WRAP.md). Click an environment/KV field name to copy its
-name without revealing or copying its value.
+## Disconnected screen and native SSH enrollment
 
-Use the operator-selected en-us labels and order, including “Environnement”.
-Secret-sharing controls have fr-fr/zh-cn translations defined in
-[TOKEN_WRAP.md](TOKEN_WRAP.md#language--terminology); other previously selected
-workspace labels in existing locales remain unchanged. All controls are catalog-backed.
-The environment includes the profile. Authentication and release links can
-open the system browser; KV browsing/editing is embedded in the desktop.
+The disconnected screen offers SSH-agent login and **Login with SSO**, even
+without an authorized agent key or reachable agent. Disconnected does not mean
+network-free authentication. The SSO action opens the system browser and uses
+the temporary localhost callback described in
+[AUTHENTICATION.md](AUTHENTICATION.md); it does not embed the provider login.
 
-## Disconnected screen and first SSH enrollment
+After SSO, the native controller selects **SSH Keys** for first enrollment.
+Normal SSH login selects the environment section. An unavailable personal
+database must not block profile-based enrollment. Agent-list failure leaves
+manual public-key entry available; publication errors do not silently switch
+authentication methods. The explicit **Continue with SSH** action resumes the
+CLI-compatible SSH login/cache flow only after the user's choice.
 
-The disconnected screen offers SSH-agent login and **Login with SSO**; it works even when no authorized SSH
-key exists or no agent is reachable. “Offline” here means not signed in to
-Vault, not an authentication method that works without network access.
+`agent_keys` lists public keys from the local SSH agent/Pageant, with comments
+and SHA-256 fingerprints. Rows mark keys already authorized on the role;
+**Use key** fills and focuses the public-key input without publishing it.
+Publication uses the selected/pasted public key and confirmation. Native role
+resolution and RPC validation are in [VAULT.md](VAULT.md#native-go-adapter);
+challenge, token lifecycle and first-enrollment mechanics remain in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
-The SSO action opens the system browser for the Vault/Entra OIDC challenge and
-uses a temporary local callback listener. Once SSO completes, open **SSH Keys** to allow initial public-key
-publication; do not require the environment database to load successfully
-before making the enrollment UI available. Preserve manual public-key entry
-when the agent cannot supply a key. Publication errors are explicit and do not
-silently switch authentication methods.
+## Native profile visibility exception
 
-## Vauth Secured Environnement (venv)
+In `ui/app.js`, profile rows render with `secret: !isFixed`: actual identity
+metadata is visible by default, selectable and copyable. Identity's web
+consumer masks it by default. This is an existing native exception, not a new
+UX behavior. Profile rows keep the read-only badge and no Add/Edit/Delete
+controls; native Go writes also reject profile collisions. Personal values
+use the shared masking/editing contract.
 
-- Merge the personal `.vauth_database` values and the connected entity profile
-  into one list. Profile values take precedence on a duplicate name, matching
-  the existing vauth environment contract. Show each name once.
-- Search filters the entire merged list by variable name. Identify profile
-  rows with the existing read-only badge; counts and empty states describe
-  the visible merged list, not just editable variables.
-- Preserve the compact desktop rows: aligned names, fixed-size read-only
-  value fields, icon tools, fixed right-hand actions and a scrolling list.
-- Personal values stay masked by default with the fixed placeholder (neither
-  their value nor their length in the masked field). Keep reveal/hide,
-  selection and explicit copy. Keep Add, Edit and Delete through the existing
-  dialogs/actions, never inline editing; writes retain compare-and-set.
-- Profile values remain visible, selectable and copyable, with no Add/Edit/
-  Delete action for those names. Profile collisions cannot be overwritten or
-  removed through an environment write, including a direct RPC call.
-- “Read-only style” means read-only display fields, not removal of the existing
-  personal-variable CRUD functionality. Identity metadata is actually immutable.
-- Refresh reloads the personal database and profile without losing the search.
-  This tab does not resolve project `.vauthrc` macros or launch a shell; it
-  shows the personal variables and identity sources used by venv.
+Native environment refresh obtains the current resident session/profile through
+the `session` RPC and rereads the personal dictionary, preserving the search.
 
-## Secrets: embedded KV browser/editor
+The native environment view does not resolve project `.vauthrc` macros or
+launch a shell. Configuration and data access stay in the
+[Go adapter](VAULT.md); common merge/search/CRUD requirements stay in the
+[shared Vault spec](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md).
 
-### Scope and navigation
+## Native clipboard and destructive lifecycle
 
-- “KV store only” selects mounts by their Vault engine type `kv`, not by their
-  name. Discover mounts visible to the current user's token, filter out every
-  non-KV engine, and offer a mount selector. No fixed `kv/` path or configured
-  allowlist of the operator's current mount names.
-- Discover using the user-facing mount metadata endpoint, not administrative
-  mount enumeration. Keep each mount's full path and KV version; support KV
-  v1/v2 and explicitly report unsupported versions or discovery failures.
-- Start at the selected mount's root. List the current folder, distinguish
-  folders from documents, and provide clickable breadcrumbs, parent navigation
-  and refresh. A local name filter applies to the current folder only.
-- Selecting a folder lists it; selecting a document reads its key/value pairs.
-  Show the mount, current path and selected document clearly. Fetch lazily; no
-  recursive crawl or global search. Switching mount clears the old selection.
-- Documents are not `.vauth_database` environment entries: preserve their key
-  names and JSON value types; do not uppercase names or flatten nested objects.
-  Display non-string values as JSON and copy their displayed representation.
-- Values are masked by default and reuse the read-only reveal/hide and copy
-  fields. Read-only display styling does not impose read-only storage access.
+Copy goes through the resident `copy` RPC and `internal/clipboard`, not browser
+clipboard storage. Windows copies exclude history and cloud synchronization.
+Closing the window does not clear the platform clipboard; see the
+[sharing specialization](TOKEN_WRAP.md#native-clipboard).
 
-### Writing and permissions
+Close destroys the window/browser and loses its navigation, dialogs, revealed
+values, drafts and sharing inputs/outputs. The resident Go Vault session/profile
+and saved settings survive until Quit or expiry; Minimize only hides and retains
+the same WebView. Reopening creates a fresh page and restores only the resident
+session, subject to expiry, not the old page's values or drafts.
 
-- Provide create-document, edit-document and delete-document actions according
-  to the current token's capabilities on the exact target API path. Evaluate
-  capabilities when selecting a document or preparing a new target; root-level
-  capabilities do not establish rights for all descendants.
-- Create/edit use a modal key/value editor with explicit Save/Cancel. Preserve
-  JSON types and validate the entire document before submitting; never coerce
-  objects, arrays, booleans, numbers or null into strings by accident. Adding,
-  changing or removing a field saves the resulting whole document.
-- KV v2 writes use the version read from Vault for compare-and-set; new documents
-  use CAS zero. Conflicts retain the unsaved draft and offer reload; never
-  silently retry by overwriting newer data. KV v1 has no equivalent CAS: make
-  that limitation visible before saving, without claiming conflict protection.
-- Deletion requires confirmation showing the mount and document path. KV v2
-  deletion is the current-version soft delete; no permanent destroy, metadata
-  purge, restore or version-history workflow is introduced. KV v1 deletion
-  removes the document, with its irreversible nature explicit in confirmation.
-- Capability lookup controls offered actions; Vault remains authoritative.
-  Handle a denied operation without losing an edit draft, and update permissions
-  after reconnect or an authorization failure. Do not grant permissions, change
-  policies, bypass ACLs or switch to an administrator token.
-- The environment tab and raw KV editor address the same underlying document
-  when the personal `.vauth_database` is selected. Invalidate/reload affected
-  views after writes; environment edits still enforce profile immutability.
+Native reconnect starts a new authentication epoch: clear page KV data,
+mount/permission caches and sharing forms, then rediscover for the new session.
+SSO reconnect clears the page session and requests explicit SSO again; SSH
+reconnect uses the normal forced SSH login. Session clearing also drops profile,
+personal values, agent rows, editor inputs and open dialogs. Go and page IDs
+reject replies to destroyed windows or older documents, while auth/request
+identity prevents old-session replies repopulating the current page. The bridge
+and whole-document reload behavior are detailed in
+[DEVELOPMENT.md](DEVELOPMENT.md#resident-runtime-and-disposable-window).
 
-### States and session handling
+## Native verification
 
-- Provide loading, no accessible KV mounts, empty folder, no filter match,
-  no selected document, missing document and access-denied states. A failed
-  request must not label old document values as belonging to a new path.
-- Folder navigation, mount changes and refresh clear revealed values; responses
-  from an older selection cannot overwrite a newer one. Reconnect clears all
-  browser data and permissions and re-discovers mounts for the current session.
-- Warn before abandoning an unsaved edit; successful writes/deletes refresh the
-  affected folder/document and notify the user. Persist neither secrets nor
-  drafts to settings, disk, logs or task handoffs.
-- Vault operations use the active Go session and its authentication-specific
-  renewal behavior. No session token reaches the page or remote Vault UI. The new SSO
-  authorization URL is only for authentication, not a token-bearing Vault UI
-  link or a wrapped child token.
-- Go validates the selected mount against current discovered KV mounts and
-  constructs API routes from that mount and a logical relative path. Reject
-  traversal, arbitrary/API routes and any request crossing into another or a
-  non-KV mount, including encoded bypasses. UI filtering alone is insufficient.
-
-## Acceptance before release
-
-- Default merged tab, all profile metadata, duplicate precedence, immutable
-  profile RPC validation, full-list search and existing CAS CRUD are tested.
-- KV discovery/type filtering, mount switching, navigation, typed values,
-  masking/copy, create/edit/delete, CAS conflicts, drafts, empty/404/403 states,
-  refresh/reconnect and stale-response handling are tested for KV v1/v2.
-- Backend tests reject non-KV mounts and route escapes for reads and writes;
-  exact-path capability checks are covered. No new Vault policy or administrator
-  token is needed. Real Vault verification does not write without a separately
-  agreed disposable test document.
-- Browser sign-in and updater release links work independently of embedded KV
-  navigation; KV operations do not create child tokens or open remote content.
-- SSO without an authorized SSH key, local callback validation, timeout/cancel,
-  profile loading, first public-key publication and explicit transition to
-  SSH-agent login are tested. The SSO token never enters the CLI token cache,
-  environment, page, settings, logs or crash-report payloads. An unavailable
-  personal database cannot block first key enrollment.
-- Callback registration is reviewed in both Entra and Vault owners; applies
-  remain operator-owned. Real SSO/first-enrollment validation is pending.
-- All three language catalogs cover all labels and errors. Preserve the compact
-  layout, minimum window size, tray behavior, SSH key tab and update settings.
-- Go tests/vet, Windows cross-build and a Windows UI smoke test pass. Real Vault
-  validation records permissions and engine version without recording secrets.
-- Update the user README and illustrations to the implemented interface before
-  release; describe the current embedded interface and keep screenshots synthetic.
-- Version bump, tag, release publication and channel promotion wait for the
-  operator's explicit release instruction after implementation review.
+Backend/browser tests cover the shared contract plus native profile visibility,
+agent selection, enrollment without database access, clipboard RPC and page/
+session cleanup. [DEVELOPMENT.md](DEVELOPMENT.md) defines offline and native
+Windows checks. Real Windows SSO and user-confirmed public-key enrollment remain
+operator acceptance; synthetic tests do not establish a live enrollment.
+Real Vault writes require a separately agreed disposable target. Versioning,
+publication and promotion follow [RELEASES.md](RELEASES.md) only on request.

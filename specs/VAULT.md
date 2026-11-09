@@ -1,4 +1,14 @@
-# Vault access
+# Vault access — LOCAL native adapter
+
+## Defining sources
+
+The functional data/environment, KV/JSON/CAS/ACL and navigation contract belongs
+to [vauth-ui Vault UX](https://github.com/131/vauth-ui/blob/main/specs/VAULT.md).
+Common wrap/unwrap behavior and terminology belong to
+[vauth-ui one-time secret sharing](https://github.com/131/vauth-ui/blob/main/specs/TOKEN_WRAP.md).
+This document defines native configuration, authentication, cache, Go transport
+and trust boundaries. [WORKSPACE.md](WORKSPACE.md) and
+[TOKEN_WRAP.md](TOKEN_WRAP.md) specialize only the desktop integration.
 
 ## Configuration
 
@@ -14,88 +24,87 @@ ssh_auth:
   role: $${env.VAUTH_USER_LOGIN}
 ```
 
-When `VAUTH_USER_LOGIN` is unset, the Windows account name provides it to
-`$${env.VAUTH_USER_LOGIN}` macros.
+At initialization a nonempty `VAUTH_USER_LOGIN` is preserved. Otherwise the OS
+account name, lowercased and without a Windows domain prefix, supplies it to
+`$${env.VAUTH_USER_LOGIN}` macros. SSO uses that same client environment snapshot;
+missing identity is an error, not a guessed/shared role. See
+[AUTHENTICATION.md](AUTHENTICATION.md#two-authentication-modes).
 
 ## SSH-agent sign-in
 
-Sign-in is silent, through [vauth-login](https://github.com/131/vauth-login)
-and the SSH agent: no browser, no OIDC, no password prompt. The agent is found
-as in vauth-login: `SSH_AUTH_SOCK`, then the Pageant (0.75+) and OpenSSH agent
-pipes. Tokens share vauth-login's encrypted cache
+SSH sign-in is silent, through
+[vauth-login](https://github.com/131/vauth-login) and the SSH agent: no browser,
+OIDC or password prompt in this mode. The agent is found as in vauth-login:
+`SSH_AUTH_SOCK`, then Pageant (0.75+) and OpenSSH agent pipes. Tokens share
+vauth-login's encrypted cache
 ([ssh-agent-crypt](https://github.com/131/ssh-agent-crypt)) and are renewed in
 the last third of their lease.
 
 The resolved `ssh_auth.role` is normalized to lowercase by vauth-login before
 authentication and cache identity calculation, regardless of its literal/macro
-source. Other fields and JWT/OIDC roles keep their original case.
+source. Other fields and JWT/OIDC roles in vauth-login keep their original case;
+the desktop SSO adapter separately lowercases its username role.
 
 This mode requires an authorized public key on the user's Vault SSH role.
-**Login with SSO** supports first enrollment in the desktop instead; its token
-is kept in memory, independently of the normal SSH cache.
-
-## Workspace data sources
-
-- **Vauth Secured Environnement (venv)** combines the current Vault entity
-  metadata with the personal KV v2 dictionary at
-  `private/<login>/data/.vauth_database`. Identity takes precedence and remains
-  immutable; personal writes are uppercase and use compare-and-set.
-- **SSH Keys** reads/publishes public keys only on the connected user's
-  `auth/<ssh path>/role/<login>`; the selected agent key or pasted public key
-  replaces `public_keys` after confirmation and a capability check.
-- **Secrets browser** discovers visible engines using `sys/internal/ui/mounts`
-  and filters by type `kv`, not the mount name. Go retains the mount/version
-  registry and rejects arbitrary mount/API routes, traversal and encoded
-  escapes. Unsupported versions and access failures are explicit.
-
-For `<mount>/<path>`, KV v1 uses the direct route. KV v2 lists its `metadata/`
-route and reads/writes its `data/` route. Folder listing is lazy; documents keep
-JSON key names and value types. Each operation checks `sys/capabilities-self`
-for the exact target and remains subject to Vault's actual response.
-
-KV v2 POST writes use CAS zero for new documents and the read version for edits.
-Conflicts preserve the editor draft. DELETE soft-deletes the current KV v2
-version; no metadata purge/permanent destroy is offered. KV v1 writes lack CAS
-and its DELETE is permanent, with this distinction shown in the editor and
-confirmation. Mount settings, policies and other users' roles are not writable.
+**Login with SSO** supports native first enrollment instead, independently of
+the SSH cache; see [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Authentication modes
 
-SSH-agent login uses the existing shared encrypted vauth-login cache. SSO holds
-the freshly issued Vault token only in Go memory, renews it through Vault if
-renewable and requires explicit login on expiry/revocation. It does not call
-SSH/JWT `Connect` or read/write the CLI cache; see
-[AUTHENTICATION.md](AUTHENTICATION.md). Session tokens and callback codes never enter
-the page, settings, logs or URLs containing a Vault credential.
+SSH-agent login uses the shared encrypted vauth-login cache. SSO keeps its
+freshly issued Vault token only in Go memory, renews through Vault if renewable
+and requires explicit login on expiry/revocation. It neither calls SSH/JWT
+`Connect` nor reads/writes the CLI cache. Challenge/callback, enrollment and
+explicit transition back to SSH are defined in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
-Vault calls run in Go; [WORKSPACE.md](WORKSPACE.md) defines the list/editor UI.
-Response wrapping is defined in [TOKEN_WRAP.md](TOKEN_WRAP.md). Wrapping tokens are
-explicit user input/output in the page, unlike the Go-only authentication token.
+Session tokens and callback codes never enter the page, settings, logs or
+credential-bearing URLs. Shareable wrapping tokens are deliberate page input/
+output, unlike the Go-only authentication token; see the
+[native sharing specialization](TOKEN_WRAP.md).
 
-### Operator profile verification — October 27, 2026
+## Native Go adapter
 
-Read-only verification with the current operator's non-root token confirmed
-its entity matches the operator environment. User-facing mount discovery
-returned exactly two KV engines, both version 2:
+Vault calls run in `internal/vault` through vauth-login's configured/trusted
+client, never directly from the WebView. `app.go` exposes typed RPC arguments
+and sanitized results/errors. The native adapter retains the configured
+transport, timeout and redirect policy; wrapping's header adaptation is in
+[TOKEN_WRAP.md](TOKEN_WRAP.md#native-go-transport).
 
-| Mount | Root metadata capabilities | Root data capabilities |
-|-------|----------------------------|------------------------|
-| `private/<login>/` | create, delete, list, read, update | create, delete, list, read, update |
-| `secrets/` | list, read | deny |
+The native `databasePath` resolves `private/<login>/data/.vauth_database` from
+the connected Vault entity login, not the OS account fallback used at startup.
+The dictionary/entity shape and merge/write behavior use the shared contract.
+Go enforces profile/fixed-name immutability even for a direct environment-write RPC;
+[WORKSPACE.md](WORKSPACE.md#native-profile-visibility-exception) records the
+native display exception without changing those data rules.
 
-The actual personal mount is named `private`, not `personal`. These are
-`sys/capabilities-self` observations at the roots only: a `deny` at the shared
-data root does not establish rights on descendant document paths. The UI must
-query each actual target's capabilities. No secret document values were read,
-no secret paths were enumerated, and no Vault data or ACLs were modified.
+For native SSH publication, Go resolves `ssh_auth.path` (default `ssh`) and the
+connected entity login into `auth/<ssh path>/role/<login>`, never a
+caller-supplied role/user route. `ReadSSH` returns public keys; `PublishSSH`
+validates the selected/pasted authorized-key line and checks the resolved
+role's capabilities before replacing `public_keys`. Agent enumeration
+stays native, separate from Vault role access; selection/confirmation and first
+enrollment are described in [WORKSPACE.md](WORKSPACE.md#disconnected-screen-and-native-ssh-enrollment).
+The SSH adapter accepts no private key material and exposes no other users'
+roles or policies.
 
-## Security
+`internal/vault/kv.go` keeps the discovered mount/version registry in Go and
+constructs Vault routes from a registered KV mount plus a logical relative path.
+RPC callers cannot supply arbitrary API routes or cross into another/non-KV
+mount. Native validation rejects traversal, leading slashes, backslashes,
+percent-encoded escapes, query/fragment delimiters and control characters;
+unsupported versions fail explicitly. UI filtering is not the trust boundary.
+The shared spec owns discovery, version-specific API semantics and exact-target
+ACL requirements; this local section defines their Go enforcement boundary,
+not a second KV route/permission table.
 
-- Whoever controls the SSH agent can sign in as the user.
-- Secrets are fetched on request, not persisted by the UI. Closing the GUI
-  drops its displayed/draft values, while the resident Vault session/profile
-  remain in memory until Quit or expiry. Copy uses the platform clipboard; on
-  Windows, history and cloud clipboard inclusion are disabled.
-- The page runs no remote content (strict CSP); Vault calls are made from Go,
-  never from the WebView.
-- The selected `.vauthrc` decides which Vault the application talks to.
+## Native security and lifetime
+
+- Whoever controls the SSH agent can sign in as the user; lock the OS session.
+- The selected `.vauthrc` determines the Vault destination and its trust policy.
+- The standalone page has a strict CSP and no remote content or Vault calls.
+- The resident Vault session/profile survives GUI Close but not Quit/expiry.
+  Displayed/draft secrets belong to the disposable page; native cleanup and
+  private clipboard behavior are defined in
+  [WORKSPACE.md](WORKSPACE.md#native-clipboard-and-destructive-lifecycle), with
+  window ownership in [TRAY.md](TRAY.md).
